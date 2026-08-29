@@ -10,10 +10,12 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test src/**/*.test.ts scripts/*.test.ts",
     "bench": "tsx scripts/bench.ts",
     "bench:update": "tsx scripts/bench.ts --update",
-    "verify": "npm test && npm run lint && npm run build && npm run bench"
+    "security:scan": "tsx scripts/public-safety-scan.ts",
+    "license:scan": "tsx scripts/dependency-license-scan.ts",
+    "verify": "npm test && npm run lint && npm run build && npm run bench && npm run security:scan && npm run license:scan"
   },
   "dependencies": {
     "next": "16.2.10",
