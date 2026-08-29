@@ -23,3 +23,16 @@ test("blocks a zero historical baseline without non-finite output", () => {
   assert.deepEqual(result.call.evidence.map((item) => item.id), ["exposure-vs-history"]);
   assert.equal(Number.isFinite(result.exposureDelta), true);
 });
+
+test("truthfully explains a non-finite current historical metric", () => {
+  const snapshot = {
+    ...getSyntheticEntity("content_steady")!,
+    exposure: Number.NaN,
+  };
+  const result = compareHistoricalBaseline(snapshot);
+
+  assert.equal(result.call.status, "blocked");
+  assert.match(result.call.evidence[0].claim, /current exposure or historical median/);
+  assert.match(result.call.reason, /current exposure and historical median/);
+  assert.equal(Number.isFinite(result.exposureDelta), true);
+});

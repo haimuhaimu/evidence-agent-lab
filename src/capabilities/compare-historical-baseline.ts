@@ -18,7 +18,7 @@ export const compareHistoricalBaselineCapability: Capability<
       capability: "compareHistoricalBaseline",
       claim: canCompare
         ? "Exposure is compared with its historical median."
-        : "Exposure cannot be compared with a zero or non-finite historical median.",
+        : "Exposure cannot be compared when the current exposure or historical median is invalid.",
       value: exposureDelta,
       source: "synthetic",
       confidence: canCompare ? "high" : "low",
@@ -32,7 +32,7 @@ export const compareHistoricalBaselineCapability: Capability<
         evidence: [evidence],
         reason: canCompare
           ? "Computed the exposure delta from the historical median."
-          : "A finite, non-zero historical median is required.",
+          : "Finite current exposure and historical median values, with a non-zero median, are required.",
       },
     };
   },

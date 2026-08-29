@@ -40,3 +40,17 @@ test("blocks zero peer baselines without non-finite outputs", () => {
   assert.equal(Number.isFinite(result.clickRateDelta), true);
   assert.equal(Number.isFinite(result.completionRateDelta), true);
 });
+
+test("truthfully explains a non-finite current peer metric", () => {
+  const snapshot = {
+    ...getSyntheticEntity("content_steady")!,
+    clickRate: Number.POSITIVE_INFINITY,
+  };
+  const result = comparePeerBenchmark(snapshot);
+  const clickEvidence = result.call.evidence.find((item) => item.id === "click-rate-vs-peer")!;
+
+  assert.equal(result.call.status, "blocked");
+  assert.match(clickEvidence.claim, /current metric or peer median/);
+  assert.match(result.call.reason, /current metrics and peer medians/);
+  assert.equal(Number.isFinite(result.clickRateDelta), true);
+});

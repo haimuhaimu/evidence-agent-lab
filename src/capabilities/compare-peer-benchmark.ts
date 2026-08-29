@@ -23,7 +23,7 @@ function compareMetric(
       capability: "comparePeerBenchmark",
       claim: canCompare
         ? "The current metric is compared with its peer median."
-        : "The metric cannot be compared with a zero or non-finite peer median.",
+        : "The metric cannot be compared when the current metric or peer median is invalid.",
       value: delta,
       source: "synthetic",
       confidence: canCompare ? "high" : "low",
@@ -53,7 +53,7 @@ export const comparePeerBenchmarkCapability: Capability<SyntheticEntitySnapshot,
         status: blocked ? "blocked" : "completed",
         evidence: comparisons.map((comparison) => comparison.evidence),
         reason: blocked
-          ? "Finite, non-zero peer medians are required for every comparison."
+          ? "Finite current metrics and peer medians, with non-zero medians, are required."
           : "Computed exposure, click-rate, and completion-rate peer deltas.",
       },
     };

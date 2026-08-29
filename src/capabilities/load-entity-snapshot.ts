@@ -5,7 +5,10 @@ import type { Capability, SnapshotResult } from "./types";
 export const loadEntitySnapshotCapability: Capability<string, SnapshotResult> = {
   name: "loadEntitySnapshot",
   run(entityId) {
-    const snapshot = getSyntheticEntity(entityId);
+    const declaredSnapshot = getSyntheticEntity(entityId);
+    const snapshot = declaredSnapshot
+      ? Object.freeze({ ...declaredSnapshot })
+      : undefined;
     const evidence: Evidence = snapshot
       ? {
           id: "entity-snapshot",
