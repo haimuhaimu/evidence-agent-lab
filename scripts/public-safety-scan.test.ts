@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -64,7 +65,7 @@ test("detects common synthetic credential shapes", () => {
     "fixtures/aws.txt": "AKIA" + "EXAMPLEEXAMPLE12",
     "fixtures/private-key.txt": "-----BEGIN " + "PRIVATE KEY-----",
     "fixtures/cookie.txt":
-      "Cookie: session_id=" + "synthetic-cookie-value-123456",
+      ["Coo", "kie: session_id=", "synthetic-cookie-value-123456"].join(""),
     "fixtures/bearer.txt":
       "Authorization: Bearer " + "synthetic.bearer.token.123456",
   };
@@ -104,7 +105,7 @@ test("detects macOS, Linux, and Windows user directories", () => {
     "fixtures/linux.txt": "/" + "home/example/work/item.txt",
     "fixtures/linux-root.txt": "/" + "root/private/item.txt",
     "fixtures/windows.txt": "C:" + "\\Users\\example\\work\\item.txt",
-    "fixtures/windows-slashes.txt": "C:" + "/Users/example/work/item.txt",
+    "fixtures/windows-slashes.txt": "C:" + "/" + "Users/example/work/item.txt",
   });
 
   assert.deepEqual(
@@ -284,21 +285,38 @@ test("fails closed generically on malformed hash-route query escapes", () => {
   }
 });
 
-test("does not scan the documented deny-rule files", () => {
+test("does not grant whole-file exemptions to scanner or privacy paths", () => {
   const findings = scanTrackedContent({
-    "scripts/public-safety-scan.ts": "ghp_" + "synthetic_example_token_123456",
+    "scripts/public-safety-scan.ts": "ghp_" + "syntheticalphanumerictoken123456",
     "scripts/public-safety-scan.test.ts": "/" + "Users/example/private",
     "docs/privacy.md": "source:" + "internal-fixture",
   });
 
-  assert.deepEqual(findings, []);
+  assert.deepEqual(findings, [
+    { path: "scripts/public-safety-scan.ts", rule: "credential-shape" },
+    { path: "scripts/public-safety-scan.test.ts", rule: "local-path" },
+    { path: "docs/privacy.md", rule: "internal-source" },
+  ]);
+});
+
+test("limits the scanner-test allowance to malformed URL occurrences", () => {
+  const findings = scanTrackedContent({
+    "scripts/public-safety-scan.test.ts":
+      "https://example.invalid/docs?path=%ZZ "
+      + "https://example.invalid/#%2Fdocs%3Fpath%3D%25ZZ and /"
+      + "Users/example/private",
+  });
+
+  assert.deepEqual(findings, [
+    { path: "scripts/public-safety-scan.test.ts", rule: "local-path" },
+  ]);
 });
 
 test("reports only the path and rule for synthetic identity shapes", () => {
   const findings = scanTrackedContent({
     "fixtures/email.txt":
       "contact: synthetic.person@" + "example.invalid",
-    "fixtures/phone.txt": "contact: +1 555 010 0123",
+    "fixtures/phone.txt": "contact: +" + "1 555 010 0123",
   });
 
   assert.deepEqual(
@@ -399,7 +417,7 @@ test("enforces eight to fifteen total digits for plus candidates", () => {
   assert.ok(findings.every((item) => item.rule === "real-identity"));
 });
 
-test("never dereferences a tracked symlink outside the repository", () => {
+test("rejects an escaping symlink without dereferencing its external target", () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), "safety-symlink-"));
   const repository = join(fixtureRoot, "repository");
   mkdirSync(repository);
@@ -415,8 +433,31 @@ test("never dereferences a tracked symlink outside the repository", () => {
 
     const result = runSafetyCli(repository);
 
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /0 public-safety findings/);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /tracked-link\tunsafe-symlink/);
+    assert.doesNotMatch(result.stderr, /credential-shape/);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test("rejects absolute and lexically escaping symlink targets", () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "safety-link-paths-"));
+
+  try {
+    mkdirSync(join(fixtureRoot, "nested"));
+    symlinkSync("/etc/passwd", join(fixtureRoot, "absolute-link"));
+    symlinkSync("../../outside.txt", join(fixtureRoot, "nested", "escaping-link"));
+    symlinkSync("../public-fixture.txt", join(fixtureRoot, "nested", "safe-link"));
+    runGit(fixtureRoot, ["init", "-q"]);
+    runGit(fixtureRoot, ["add", "absolute-link", "nested/escaping-link", "nested/safe-link"]);
+
+    const result = runSafetyCli(fixtureRoot);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /absolute-link\tunsafe-symlink/);
+    assert.match(result.stderr, /nested\/escaping-link\tunsafe-symlink/);
+    assert.doesNotMatch(result.stderr, /nested\/safe-link/);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
@@ -426,7 +467,7 @@ test("scans tracked symlink text without opening its target", () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), "safety-link-text-"));
 
   try {
-    symlinkSync("source:internal-fixture", join(fixtureRoot, "public-link"));
+    symlinkSync("source:" + "internal-fixture", join(fixtureRoot, "public-link"));
     runGit(fixtureRoot, ["init", "-q"]);
     runGit(fixtureRoot, ["add", "public-link"]);
 
@@ -440,7 +481,7 @@ test("scans tracked symlink text without opening its target", () => {
   }
 });
 
-test("skips NUL-free binary content before scanning text shapes", () => {
+test("rejects an unapproved binary instead of silently skipping it", () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), "safety-binary-"));
 
   try {
@@ -456,8 +497,108 @@ test("skips NUL-free binary content before scanning text shapes", () => {
 
     const result = runSafetyCli(fixtureRoot);
 
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /synthetic-binary\.bin\tunapproved-binary/);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+function crc32(data: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const typeBytes = Buffer.from(type, "ascii");
+  const length = Buffer.alloc(4);
+  const checksum = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  checksum.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])));
+  return Buffer.concat([length, typeBytes, data, checksum]);
+}
+
+test("allows only the two structurally valid release PNG dimensions", () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "safety-approved-png-"));
+  const publicDir = join(fixtureRoot, "public");
+  mkdirSync(publicDir);
+
+  try {
+    for (const name of ["evidence-agent-lab-desktop.png", "evidence-agent-lab-mobile.png"]) {
+      writeFileSync(
+        join(publicDir, name),
+        readFileSync(new URL(`../public/${name}`, import.meta.url)),
+      );
+    }
+    runGit(fixtureRoot, ["init", "-q"]);
+    runGit(fixtureRoot, ["add", "public"]);
+
+    const result = runSafetyCli(fixtureRoot);
+
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /0 public-safety findings/);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test("rejects credential-bearing PNG text metadata even with a valid chunk checksum", () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "safety-png-metadata-"));
+  const publicDir = join(fixtureRoot, "public");
+  mkdirSync(publicDir);
+
+  try {
+    const original = readFileSync(new URL("../public/evidence-agent-lab-desktop.png", import.meta.url));
+    const textChunk = pngChunk(
+      "tEXt",
+      Buffer.from("Comment\0" + "ghp_" + "syntheticpngtoken123456789012345", "latin1"),
+    );
+    const withMetadata = Buffer.concat([
+      original.subarray(0, original.length - 12),
+      textChunk,
+      original.subarray(original.length - 12),
+    ]);
+    writeFileSync(join(publicDir, "evidence-agent-lab-desktop.png"), withMetadata);
+    runGit(fixtureRoot, ["init", "-q"]);
+    runGit(fixtureRoot, ["add", "public/evidence-agent-lab-desktop.png"]);
+
+    const result = runSafetyCli(fixtureRoot);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /public\/evidence-agent-lab-desktop\.png\tinvalid-binary/);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test("rejects malformed or dimension-mismatched approved PNGs", () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "safety-invalid-png-"));
+  const publicDir = join(fixtureRoot, "public");
+  mkdirSync(publicDir);
+
+  try {
+    writeFileSync(
+      join(publicDir, "evidence-agent-lab-desktop.png"),
+      readFileSync(new URL("../public/evidence-agent-lab-mobile.png", import.meta.url)),
+    );
+    writeFileSync(
+      join(publicDir, "evidence-agent-lab-mobile.png"),
+      Buffer.from("not a complete png\0", "utf8"),
+    );
+    runGit(fixtureRoot, ["init", "-q"]);
+    runGit(fixtureRoot, ["add", "public"]);
+
+    const result = runSafetyCli(fixtureRoot);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /public\/evidence-agent-lab-desktop\.png\tinvalid-binary/);
+    assert.match(result.stderr, /public\/evidence-agent-lab-mobile\.png\tinvalid-binary/);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }

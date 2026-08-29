@@ -33,6 +33,16 @@ export type AgentRun = {
   unknowns: string[];
   falsification: string[];
   boundaryNotes: string[];
+  boundary: RunBoundary;
+};
+
+export type RunBoundary = {
+  scope: "synthetic_only";
+  planner: "deterministic";
+  action: "none";
+  training: "none";
+  delivery: "none" | "not_sent";
+  causal: "not_claimed";
 };
 
 export type AgentRequest = {
@@ -48,12 +58,9 @@ export type ParsedRequest = {
   clarificationNeeded: string[];
 };
 
-export type SyntheticEntitySnapshot = {
-  id: string;
-  source: "synthetic";
-  publishedHours: number;
+export type SyntheticWindowMetrics = Readonly<{
+  days: number;
   dataCompleteness: number;
-  policyFlag: boolean;
   exposure: number;
   historicalExposureMedian: number;
   peerExposureMedian: number;
@@ -63,4 +70,21 @@ export type SyntheticEntitySnapshot = {
   peerCompletionRate: number;
   feedShare: number;
   historicalFeedShare: number;
-};
+}>;
+
+export type SyntheticEntityFixture = Readonly<{
+  id: string;
+  source: "synthetic";
+  publishedHours: number;
+  policyFlag: boolean;
+  windows: ReadonlyArray<SyntheticWindowMetrics>;
+}>;
+
+export type SyntheticEntitySnapshot = Readonly<{
+  id: string;
+  source: "synthetic";
+  publishedHours: number;
+  policyFlag: boolean;
+  requestedDays: number;
+  metrics: SyntheticWindowMetrics | null;
+}>;

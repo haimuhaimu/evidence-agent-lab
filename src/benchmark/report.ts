@@ -24,6 +24,39 @@ export function toBenchmarkSnapshot(
   };
 }
 
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, canonicalize(item)]),
+    );
+  }
+
+  return value;
+}
+
+export function serializeBenchmarkSnapshot(snapshot: BenchmarkSnapshot): string {
+  return `${JSON.stringify(snapshot, null, 2)}\n`;
+}
+
+export function benchmarkSnapshotsEqual(
+  existing: string,
+  expected: BenchmarkSnapshot,
+): boolean {
+  try {
+    const parsed: unknown = JSON.parse(existing);
+    return JSON.stringify(canonicalize(parsed))
+      === JSON.stringify(canonicalize(expected));
+  } catch {
+    return false;
+  }
+}
+
 export function formatBenchmarkTable(report: BenchmarkReport): string {
   const gateWidth = Math.max(
     "Gate".length,

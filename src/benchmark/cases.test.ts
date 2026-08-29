@@ -1,28 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { CapabilityName } from "../core/types";
-import { BENCHMARK_CASES, DEFAULT_HONESTY_CHECKS } from "./cases";
-
-const ALL_CAPABILITIES: CapabilityName[] = [
-  "loadEntitySnapshot",
-  "checkSafetyGate",
-  "compareHistoricalBaseline",
-  "comparePeerBenchmark",
-  "attributeSignalDrop",
-  "checkDistributionPath",
-  "buildEscalationPacket",
-];
-
-const BASE_CAPABILITIES = ALL_CAPABILITIES.slice(0, 5);
-const BASE_EVIDENCE = [
-  "entity-snapshot",
-  "data-completeness",
-  "publish-age",
-  "exposure-vs-history",
-  "click-rate-vs-peer",
-  "completion-rate-vs-peer",
-  "primary-signal",
-];
+import { BENCHMARK_CASES, DEFAULT_BOUNDARY } from "./cases";
 
 const EXPECTED_CASES = [
   ["steady_7d", "content_steady", "diagnose", 7, "expected"],
@@ -45,76 +23,70 @@ const EXPECTED_CASES = [
   ["healthy_scale_30d", "content_scale", "scale", 30, "scale"],
 ] as const;
 
-test("ships exactly eighteen unique benchmark cases", () => {
+test("ships exactly the eighteen fixed request and decision contracts", () => {
   assert.equal(BENCHMARK_CASES.length, 18);
   assert.equal(new Set(BENCHMARK_CASES.map((item) => item.id)).size, 18);
   assert.deepEqual(
     BENCHMARK_CASES.map((item) => [
       item.id,
-      item.request.entityId,
-      item.expectedIntent.goal,
-      item.expectedIntent.days,
+      item.expectedRequest.entityId,
+      item.expectedRequest.goal,
+      item.expectedRequest.days,
       item.expectedDecision,
     ]),
     EXPECTED_CASES,
   );
 });
 
-test("every case declares all five audit gates", () => {
+test("every case locks clarification, exact call status, evidence ownership, and boundary", () => {
   for (const item of BENCHMARK_CASES) {
-    assert.ok(item.expectedIntent);
-    assert.ok(Array.isArray(item.requiredCapabilities));
-    assert.ok(Array.isArray(item.forbiddenCapabilities));
-    assert.ok(item.requiredEvidence.length > 0 || item.expectedDecision === "insufficient_evidence");
-    assert.ok(item.honestyChecks.length > 0);
-    assert.deepEqual(item.honestyChecks, DEFAULT_HONESTY_CHECKS);
+    assert.equal(item.expectedRequest.query, item.request.query, item.id);
+    assert.ok(Array.isArray(item.expectedRequest.clarificationNeeded), item.id);
+    assert.ok(Array.isArray(item.expectedCalls), item.id);
+    assert.ok(Array.isArray(item.expectedEvidence), item.id);
+    assert.equal(
+      new Set(item.expectedCalls.map((call) => call.name)).size,
+      item.expectedCalls.length,
+      item.id,
+    );
+    assert.equal(
+      new Set(item.expectedEvidence.map((evidence) => evidence.id)).size,
+      item.expectedEvidence.length,
+      item.id,
+    );
+    assert.deepEqual(item.expectedBoundary, {
+      ...DEFAULT_BOUNDARY,
+      delivery: item.expectedCalls.some((call) => call.name === "buildEscalationPacket")
+        ? "not_sent"
+        : "none",
+    }, item.id);
   }
 });
 
-test("locks capability and evidence contracts for every case family", () => {
+test("locks honest early-stop contracts without invented downstream evidence", () => {
   const byId = new Map(BENCHMARK_CASES.map((item) => [item.id, item]));
-  const baseIds = [
-    "steady_7d",
-    "steady_quarter",
-    "steady_half_month",
-    "scale_healthy",
-    "scale_without_intent",
-    "click_drop",
-    "retention_drop",
-    "explicit_30d",
-    "scale_click_drop",
-    "click_drop_quarter",
-    "healthy_no_window",
-    "healthy_scale_30d",
-  ];
 
-  for (const id of baseIds) {
-    assert.deepEqual(byId.get(id)?.requiredCapabilities, BASE_CAPABILITIES, id);
-    assert.deepEqual(byId.get(id)?.forbiddenCapabilities, ALL_CAPABILITIES.slice(5), id);
-    assert.deepEqual(byId.get(id)?.requiredEvidence, BASE_EVIDENCE, id);
-  }
-
-  for (const id of ["feed_drop", "feed_drop_quarter"]) {
-    assert.deepEqual(byId.get(id)?.requiredCapabilities, ALL_CAPABILITIES, id);
-    assert.deepEqual(byId.get(id)?.forbiddenCapabilities, [], id);
-    assert.deepEqual(
-      byId.get(id)?.requiredEvidence,
-      [...BASE_EVIDENCE, "feed-share-vs-history", "escalation-packet"],
-      id,
-    );
-  }
-
-  for (const id of ["incomplete_data", "scale_incomplete"]) {
-    assert.deepEqual(byId.get(id)?.requiredCapabilities, ALL_CAPABILITIES.slice(0, 2), id);
-    assert.deepEqual(byId.get(id)?.forbiddenCapabilities, ALL_CAPABILITIES.slice(2), id);
-    assert.deepEqual(byId.get(id)?.requiredEvidence, ["entity-snapshot", "data-completeness"], id);
-  }
-
-  assert.deepEqual(byId.get("unknown_object")?.requiredCapabilities, ALL_CAPABILITIES.slice(0, 1));
-  assert.deepEqual(byId.get("unknown_object")?.forbiddenCapabilities, ALL_CAPABILITIES.slice(1));
-  assert.deepEqual(byId.get("unknown_object")?.requiredEvidence, ["entity-not-found"]);
-
-  assert.deepEqual(byId.get("missing_object")?.requiredCapabilities, []);
-  assert.deepEqual(byId.get("missing_object")?.forbiddenCapabilities, ALL_CAPABILITIES);
-  assert.deepEqual(byId.get("missing_object")?.requiredEvidence, []);
+  assert.deepEqual(byId.get("missing_object")?.expectedCalls, []);
+  assert.deepEqual(byId.get("missing_object")?.expectedEvidence, []);
+  assert.deepEqual(byId.get("missing_object")?.expectedRequest.clarificationNeeded, [
+    "Choose a synthetic content object.",
+  ]);
+  assert.deepEqual(byId.get("unknown_object")?.expectedCalls, [
+    { name: "loadEntitySnapshot", status: "blocked" },
+  ]);
+  assert.deepEqual(byId.get("unknown_object")?.expectedEvidence, [
+    {
+      id: "entity-not-found",
+      capability: "loadEntitySnapshot",
+      value: "content_missing",
+    },
+  ]);
+  assert.deepEqual(byId.get("incomplete_data")?.expectedCalls, [
+    { name: "loadEntitySnapshot", status: "completed" },
+    { name: "checkSafetyGate", status: "blocked" },
+  ]);
+  assert.equal(
+    byId.get("incomplete_data")?.expectedEvidence.find((item) => item.id === "data-completeness")?.value,
+    0.5,
+  );
 });

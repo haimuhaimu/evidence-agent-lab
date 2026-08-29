@@ -3,7 +3,12 @@ import test from "node:test";
 import { runEvidenceAgent } from "../agent/run-agent";
 import { BENCHMARK_CASES } from "./cases";
 import { evaluateCase } from "./evaluate-case";
-import { formatBenchmarkTable, toBenchmarkSnapshot } from "./report";
+import {
+  benchmarkSnapshotsEqual,
+  formatBenchmarkTable,
+  serializeBenchmarkSnapshot,
+  toBenchmarkSnapshot,
+} from "./report";
 import { runBenchmark } from "./run-benchmark";
 
 const ALL_GATES_AT_EIGHTEEN = {
@@ -56,6 +61,15 @@ test("creates a stable snapshot without the local timing field", () => {
     gateTotals: ALL_GATES_AT_EIGHTEEN,
     cases: report.cases,
   });
+});
+
+test("compares benchmark snapshots canonically across CRLF without accepting semantic changes", () => {
+  const snapshot = toBenchmarkSnapshot(runBenchmark(deterministicClock()));
+  const serialized = serializeBenchmarkSnapshot(snapshot);
+
+  assert.equal(benchmarkSnapshotsEqual(serialized.replaceAll("\n", "\r\n"), snapshot), true);
+  assert.equal(benchmarkSnapshotsEqual(serialized.replace('"caseCount": 18', '"caseCount": 17'), snapshot), false);
+  assert.equal(benchmarkSnapshotsEqual("not-json", snapshot), false);
 });
 
 test("formats a short terminal table with the honest audit total", () => {

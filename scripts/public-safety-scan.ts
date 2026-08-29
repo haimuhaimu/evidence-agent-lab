@@ -2,21 +2,24 @@ import { lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { TextDecoder } from "node:util";
+import path from "node:path";
 
 export type SafetyFinding = {
   path: string;
   rule:
     | "credential-shape"
+    | "invalid-binary"
     | "local-path"
     | "internal-source"
-    | "real-identity";
+    | "real-identity"
+    | "unapproved-binary"
+    | "unsafe-symlink";
 };
 
-const excludedPaths = new Set([
-  "scripts/public-safety-scan.ts",
-  "scripts/public-safety-scan.test.ts",
-  "docs/privacy.md",
-]);
+const approvedPngDimensions: ReadonlyMap<string, readonly [number, number]> = new Map([
+  ["public/evidence-agent-lab-desktop.png", [1440, 900]],
+  ["public/evidence-agent-lab-mobile.png", [390, 844]],
+] as const);
 
 const credentialShapes = [
   /\bgh[pousr]_[A-Za-z0-9]{20,}\b/,
@@ -53,6 +56,118 @@ const realIdentityShapes = [
 ];
 
 const classificationSampleBytes = 64 * 1024;
+const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const localPathOccurrenceAllowances: ReadonlyMap<string, readonly string[]> = new Map([
+  ["scripts/public-safety-scan.test.ts", ["%2F", "%25ZZ", "%ZZ", "%E0%A4%A"]],
+] as const);
+
+function crc32(data: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function isValidApprovedPng(
+  data: Buffer,
+  expectedDimensions: readonly [number, number],
+): boolean {
+  if (data.length < pngSignature.length + 12 || !data.subarray(0, 8).equals(pngSignature)) {
+    return false;
+  }
+
+  let offset = 8;
+  let chunkIndex = 0;
+  let sawImageData = false;
+  let sawEnd = false;
+  while (offset < data.length) {
+    if (offset + 12 > data.length) {
+      return false;
+    }
+
+    const length = data.readUInt32BE(offset);
+    const chunkEnd = offset + 12 + length;
+    if (chunkEnd > data.length) {
+      return false;
+    }
+
+    const typeBytes = data.subarray(offset + 4, offset + 8);
+    const type = typeBytes.toString("ascii");
+    if (!/^[A-Za-z]{4}$/.test(type) || !["IHDR", "IDAT", "IEND"].includes(type)) {
+      return false;
+    }
+
+    const chunkData = data.subarray(offset + 8, offset + 8 + length);
+    const expectedCrc = data.readUInt32BE(offset + 8 + length);
+    if (crc32(Buffer.concat([typeBytes, chunkData])) !== expectedCrc) {
+      return false;
+    }
+
+    if (chunkIndex === 0) {
+      if (type !== "IHDR" || length !== 13) {
+        return false;
+      }
+      const [expectedWidth, expectedHeight] = expectedDimensions;
+      const width = chunkData.readUInt32BE(0);
+      const height = chunkData.readUInt32BE(4);
+      const compression = chunkData[10];
+      const filtering = chunkData[11];
+      const interlace = chunkData[12];
+      if (
+        width !== expectedWidth
+        || height !== expectedHeight
+        || compression !== 0
+        || filtering !== 0
+        || ![0, 1].includes(interlace)
+      ) {
+        return false;
+      }
+    } else if (type === "IHDR") {
+      return false;
+    }
+
+    if (type === "IDAT") {
+      if (sawEnd) {
+        return false;
+      }
+      sawImageData = true;
+    }
+
+    if (type === "IEND") {
+      if (length !== 0 || !sawImageData || chunkEnd !== data.length) {
+        return false;
+      }
+      sawEnd = true;
+    } else if (sawEnd) {
+      return false;
+    }
+
+    chunkIndex += 1;
+    offset = chunkEnd;
+  }
+
+  return sawEnd;
+}
+
+function symlinkEscapesRepository(trackedPath: string, target: string): boolean {
+  const normalizedTarget = target.replaceAll("\\", "/");
+  if (
+    path.posix.isAbsolute(normalizedTarget)
+    || path.win32.isAbsolute(target)
+    || normalizedTarget.startsWith("//")
+  ) {
+    return true;
+  }
+
+  const resolved = path.posix.normalize(
+    path.posix.join(path.posix.dirname(trackedPath), normalizedTarget),
+  );
+  return resolved === ".." || resolved.startsWith("../");
+}
 
 function decodeUrlValue(value: string): string {
   try {
@@ -117,6 +232,24 @@ function localPathScanContent(content: string): string {
   return [contentWithoutWebRoutes, ...decodedValues].join("\n");
 }
 
+function applyLocalPathOccurrenceAllowances(
+  trackedPath: string,
+  content: string,
+): string {
+  const allowedOccurrences = localPathOccurrenceAllowances.get(trackedPath);
+  if (!allowedOccurrences) {
+    return content;
+  }
+
+  return allowedOccurrences.reduce(
+    (result, occurrence) => result.replaceAll(
+      occurrence,
+      occurrence.replaceAll("%", "%2525"),
+    ),
+    content,
+  );
+}
+
 function isBinaryContent(data: Buffer): boolean {
   const sample = data.subarray(0, classificationSampleBytes);
   if (sample.length === 0) {
@@ -153,17 +286,15 @@ export function scanTrackedContent(
   const findings: SafetyFinding[] = [];
 
   for (const [path, content] of Object.entries(files)) {
-    if (excludedPaths.has(path)) {
-      continue;
-    }
-
     const normalizedContent = content.toLowerCase();
     const rules = new Set<SafetyFinding["rule"]>();
 
     if (credentialShapes.some((shape) => shape.test(content))) {
       rules.add("credential-shape");
     }
-    const contentForLocalPathScan = localPathScanContent(content);
+    const contentForLocalPathScan = localPathScanContent(
+      applyLocalPathOccurrenceAllowances(path, content),
+    );
     if (localPathShapes.some((shape) => shape.test(contentForLocalPathScan))) {
       rules.add("local-path");
     }
@@ -182,7 +313,10 @@ export function scanTrackedContent(
   return findings;
 }
 
-function loadTrackedTextFiles(): Record<string, string> {
+function loadTrackedContent(): {
+  files: Record<string, string>;
+  findings: SafetyFinding[];
+} {
   const result = spawnSync("git", ["ls-files", "-z"], {
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,
@@ -193,33 +327,47 @@ function loadTrackedTextFiles(): Record<string, string> {
   }
 
   const files: Record<string, string> = {};
-  for (const path of result.stdout.split("\0")) {
-    if (path.length === 0 || excludedPaths.has(path)) {
+  const findings: SafetyFinding[] = [];
+  for (const trackedPath of result.stdout.split("\0")) {
+    if (trackedPath.length === 0) {
       continue;
     }
 
-    const stat = lstatSync(path);
+    const stat = lstatSync(trackedPath);
     if (stat.isSymbolicLink()) {
-      files[path] = readlinkSync(path, "utf8");
+      const target = readlinkSync(trackedPath, "utf8");
+      if (symlinkEscapesRepository(trackedPath, target)) {
+        findings.push({ path: trackedPath, rule: "unsafe-symlink" });
+      }
+      files[trackedPath] = target;
       continue;
     }
     if (!stat.isFile()) {
       throw new Error("tracked path is not a file or symbolic link");
     }
 
-    const data = readFileSync(path);
+    const data = readFileSync(trackedPath);
     if (isBinaryContent(data)) {
+      const expectedDimensions = approvedPngDimensions.get(trackedPath);
+      if (expectedDimensions && isValidApprovedPng(data, expectedDimensions)) {
+        continue;
+      }
+      findings.push({
+        path: trackedPath,
+        rule: expectedDimensions ? "invalid-binary" : "unapproved-binary",
+      });
       continue;
     }
-    files[path] = data.toString("utf8");
+    files[trackedPath] = data.toString("utf8");
   }
 
-  return files;
+  return { files, findings };
 }
 
 function runCli(): void {
   try {
-    const findings = scanTrackedContent(loadTrackedTextFiles());
+    const loaded = loadTrackedContent();
+    const findings = [...loaded.findings, ...scanTrackedContent(loaded.files)];
     if (findings.length === 0) {
       console.log("0 public-safety findings");
       return;

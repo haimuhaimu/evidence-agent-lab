@@ -7,7 +7,7 @@ import { SYNTHETIC_ENTITIES } from "../data/synthetic-entities";
 import { createReview, saveReview } from "../review/feedback-store";
 import styles from "./agent-workspace.module.css";
 import { TraceView } from "./trace-view";
-import { buildAgentViewModel } from "./view-model";
+import { buildAgentViewModel, isReviewCurrent } from "./view-model";
 
 const EXAMPLES = [
   {
@@ -70,6 +70,7 @@ export function AgentWorkspace({ auditPassRate }: { auditPassRate: number }) {
   const correctionOptions = DECISION_OPTIONS.filter(
     (option) => option.value !== run.decision,
   );
+  const reviewCurrent = isReviewCurrent(run, { entityId, query });
 
   function execute(nextEntityId = entityId, nextQuery = query) {
     try {
@@ -98,6 +99,11 @@ export function AgentWorkspace({ auditPassRate }: { auditPassRate: number }) {
   }
 
   function storeReview(verdict: "accurate" | "needs_correction") {
+    if (!reviewCurrent) {
+      setReviewStatus("Run the changed request before reviewing it.");
+      return;
+    }
+
     try {
       const selectedLabel = DECISION_OPTIONS.find(
         (option) => option.value === correctedDecision,
@@ -207,6 +213,10 @@ export function AgentWorkspace({ auditPassRate }: { auditPassRate: number }) {
               <code>{view.decision}</code>
             </div>
             <p className={styles.decisionSummary}>{view.summary}</p>
+            <p className={styles.reviewedRequest}>
+              Reviewing <code>{view.reviewedRequest.entityId || "no entity selected"}</code>
+              <span>{view.reviewedRequest.query}</span>
+            </p>
 
             <div className={styles.evidenceBlock}>
               <h3>Primary evidence</h3>
@@ -223,6 +233,15 @@ export function AgentWorkspace({ auditPassRate }: { auditPassRate: number }) {
               </ul>
             </div>
 
+            {view.unknowns.length > 0 ? (
+              <div className={styles.evidenceGaps} role="status">
+                <h3>Evidence gaps</h3>
+                <ul>
+                  {view.unknowns.map((unknown) => <li key={unknown}>{unknown}</li>)}
+                </ul>
+              </div>
+            ) : null}
+
             <div className={styles.nextAction}>
               <h3>Next action</h3>
               <p>{view.falsification[0] ?? "Rerun after adding a declared synthetic evidence source."}</p>
@@ -233,7 +252,7 @@ export function AgentWorkspace({ auditPassRate }: { auditPassRate: number }) {
               <TraceView run={run} />
             </details>
 
-            <fieldset className={styles.reviewControls}>
+            <fieldset className={styles.reviewControls} disabled={!reviewCurrent}>
               <legend>Review this run</legend>
               <div className={styles.reviewRow}>
                 <button type="button" onClick={() => storeReview("accurate")}>
@@ -253,7 +272,11 @@ export function AgentWorkspace({ auditPassRate }: { auditPassRate: number }) {
                   Needs correction
                 </button>
               </div>
-              <p className={styles.reviewNote}>Reviews stay in local storage and are never submitted.</p>
+              <p className={styles.reviewNote}>
+                {reviewCurrent
+                  ? "Reviews stay in local storage and are never submitted."
+                  : "Form changed. Run analysis before reviewing this request."}
+              </p>
               <p className={styles.reviewStatus} role="status">{reviewStatus}</p>
             </fieldset>
           </section>

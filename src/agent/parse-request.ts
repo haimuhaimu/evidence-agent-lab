@@ -3,18 +3,30 @@ import type { AgentRequest, ParsedRequest } from "../core/types";
 const WINDOW_PATTERNS: Array<[RegExp, (match: RegExpMatchArray) => number]> = [
   [/半个月/, () => 15],
   [/(?:一|1)个?季度|近一季度/, () => 90],
-  [/近\s*(\d+)\s*天/, (match) => Number(match[1])],
 ];
+
+const EXPLICIT_DAY_WINDOW = /近\s*([^\s天]+)\s*天/;
 
 export function parseAgentRequest(request: AgentRequest): ParsedRequest {
   const clarificationNeeded = request.entityId.trim() ? [] : ["Choose a synthetic content object."];
-  const explicitDays = WINDOW_PATTERNS.map(([pattern, toDays]) => {
+  const namedDays = WINDOW_PATTERNS.map(([pattern, toDays]) => {
     const match = request.query.match(pattern);
     return match ? toDays(match) : undefined;
   }).find((value) => value !== undefined);
+  const numericMatch = request.query.match(EXPLICIT_DAY_WINDOW);
+  const numericText = numericMatch?.[1];
+  const validNumericText = numericText !== undefined && /^\d+$/.test(numericText);
+  const numericDays = validNumericText ? Number(numericText) : undefined;
+  const explicitDays = numericText !== undefined ? numericDays : namedDays;
+  const invalidExplicitWindow = numericText !== undefined && (
+    !validNumericText
+    || !Number.isSafeInteger(numericDays)
+    || numericDays! < 1
+    || numericDays! > 180
+  );
 
-  if (explicitDays !== undefined && (!Number.isFinite(explicitDays) || explicitDays < 1 || explicitDays > 180)) {
-    clarificationNeeded.push("Use a time window between 1 and 180 days.");
+  if (invalidExplicitWindow) {
+    clarificationNeeded.push("Use a whole-number time window between 1 and 180 days.");
   }
 
   return {

@@ -1,18 +1,23 @@
 import type {
   AgentRequest,
-  CapabilityName,
+  CapabilityCall,
   Decision,
+  Evidence,
+  ParsedRequest,
+  RunBoundary,
 } from "../core/types";
+
+export type ExpectedCall = Pick<CapabilityCall, "name" | "status">;
+export type ExpectedEvidence = Pick<Evidence, "id" | "capability" | "value">;
 
 export type BenchmarkCase = {
   id: string;
   request: AgentRequest;
-  expectedIntent: { goal: "diagnose" | "scale"; days: number };
-  requiredCapabilities: CapabilityName[];
-  forbiddenCapabilities: CapabilityName[];
-  requiredEvidence: string[];
+  expectedRequest: ParsedRequest;
+  expectedCalls: ExpectedCall[];
+  expectedEvidence: ExpectedEvidence[];
   expectedDecision: Decision;
-  honestyChecks: string[];
+  expectedBoundary: RunBoundary;
 };
 
 export type AuditGates = {

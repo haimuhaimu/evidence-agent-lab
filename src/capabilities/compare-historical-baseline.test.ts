@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getSyntheticEntity } from "../data/synthetic-entities";
+import { loadEntitySnapshot } from "./load-entity-snapshot";
 import { compareHistoricalBaseline } from "./compare-historical-baseline";
 
+function snapshot(entityId = "content_steady") {
+  return loadEntitySnapshot({ entityId, days: 7 }).snapshot!;
+}
+
 test("computes the historical exposure delta", () => {
-  const result = compareHistoricalBaseline(getSyntheticEntity("content_click_drop")!);
+  const result = compareHistoricalBaseline(snapshot("content_click_drop"));
 
   assert.equal(result.exposureDelta, -0.4);
   assert.equal(result.call.status, "completed");
@@ -13,11 +17,11 @@ test("computes the historical exposure delta", () => {
 });
 
 test("blocks a zero historical baseline without non-finite output", () => {
-  const snapshot = {
-    ...getSyntheticEntity("content_steady")!,
-    historicalExposureMedian: 0,
+  const alteredSnapshot = {
+    ...snapshot(),
+    metrics: { ...snapshot().metrics!, historicalExposureMedian: 0 },
   };
-  const result = compareHistoricalBaseline(snapshot);
+  const result = compareHistoricalBaseline(alteredSnapshot);
 
   assert.equal(result.call.status, "blocked");
   assert.deepEqual(result.call.evidence.map((item) => item.id), ["exposure-vs-history"]);
@@ -25,11 +29,11 @@ test("blocks a zero historical baseline without non-finite output", () => {
 });
 
 test("truthfully explains a non-finite current historical metric", () => {
-  const snapshot = {
-    ...getSyntheticEntity("content_steady")!,
-    exposure: Number.NaN,
+  const alteredSnapshot = {
+    ...snapshot(),
+    metrics: { ...snapshot().metrics!, exposure: Number.NaN },
   };
-  const result = compareHistoricalBaseline(snapshot);
+  const result = compareHistoricalBaseline(alteredSnapshot);
 
   assert.equal(result.call.status, "blocked");
   assert.match(result.call.evidence[0].claim, /current exposure or historical median/);

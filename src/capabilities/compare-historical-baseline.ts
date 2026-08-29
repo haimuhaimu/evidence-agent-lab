@@ -7,11 +7,13 @@ export const compareHistoricalBaselineCapability: Capability<
 > = {
   name: "compareHistoricalBaseline",
   run(snapshot) {
-    const canCompare = snapshot.historicalExposureMedian !== 0
-      && Number.isFinite(snapshot.historicalExposureMedian)
-      && Number.isFinite(snapshot.exposure);
+    const metrics = snapshot.metrics;
+    const canCompare = metrics !== null
+      && metrics.historicalExposureMedian !== 0
+      && Number.isFinite(metrics.historicalExposureMedian)
+      && Number.isFinite(metrics.exposure);
     const exposureDelta = canCompare
-      ? (snapshot.exposure - snapshot.historicalExposureMedian) / snapshot.historicalExposureMedian
+      ? (metrics!.exposure - metrics!.historicalExposureMedian) / metrics!.historicalExposureMedian
       : 0;
     const evidence: Evidence = {
       id: "exposure-vs-history",

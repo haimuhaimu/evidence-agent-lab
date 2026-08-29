@@ -13,6 +13,8 @@ The repository is a small, runnable demonstration of how a decision can stay ins
 
 An entity ID and short query enter the deterministic planner. It selects from seven declared capabilities, records each call and its evidence, then returns one of four decisions: `expected`, `scale`, `intervene`, or `insufficient_evidence`. The UI projects that same trace without adding decision rules.
 
+Each fixture declares exact synthetic metrics for 7, 15, 30, and 90 days. The requested window is part of the capability contract: an undeclared window or insufficient publication age produces explicit `window-coverage` evidence and an `insufficient_evidence` stop instead of reusing an undated metric.
+
 ## Quick Start
 
 ```bash
@@ -35,7 +37,7 @@ The checked-in snapshot at [`benchmark/latest.json`](benchmark/latest.json) cont
 
 Audit Pass Rate: 18/18 (100%)
 
-Audit Pass Rate is five-gate conformance, including an honest `insufficient_evidence` stop. It is not model accuracy.
+Audit Pass Rate is five-gate conformance, including exact request/entity/clarification state, ordered call statuses, call-owned evidence values, structured honesty fields, and an honest `insufficient_evidence` stop. It is not model accuracy.
 
 ## Representative cases
 

@@ -33,6 +33,31 @@ test("stops when evidence is incomplete", () => {
   ]);
 });
 
+test("runs only exact declared windows and honestly stops an arbitrary window", () => {
+  for (const days of [7, 15, 30, 90]) {
+    const run = runEvidenceAgent({
+      entityId: "content_steady",
+      query: `近 ${days} 天正常吗`,
+    });
+
+    assert.equal(run.decision, "expected", `${days} days`);
+    assert.equal(run.request.days, days);
+    assert.equal(run.evidence.find((item) => item.id === "window-coverage")?.value, true);
+  }
+
+  const unsupported = runEvidenceAgent({
+    entityId: "content_steady",
+    query: "近 42 天正常吗",
+  });
+  assert.equal(unsupported.decision, "insufficient_evidence");
+  assert.deepEqual(unsupported.calls.map((call) => call.name), [
+    "loadEntitySnapshot",
+    "checkSafetyGate",
+  ]);
+  assert.equal(unsupported.evidence.find((item) => item.id === "window-coverage")?.value, false);
+  assert.match(unsupported.unknowns.join(" "), /exact 42-day synthetic metric window is unavailable/i);
+});
+
 test("stops before capabilities when the entity is missing from the request", () => {
   const run = runEvidenceAgent({ entityId: "  ", query: "近 7 天正常吗" });
 
@@ -49,42 +74,26 @@ test("stops after loading an unknown synthetic entity", () => {
   assert.deepEqual(run.evidence.map((item) => item.id), ["entity-not-found"]);
 });
 
-test("stops young content at the safety gate", () => {
+test("cannot mutate a declared fixture to bypass publication-age evidence", () => {
   const entity = SYNTHETIC_ENTITIES.find((item) => item.id === "content_steady")!;
-  const publishedHours = entity.publishedHours;
-  entity.publishedHours = 1;
+  assert.throws(() => {
+    (entity as { publishedHours: number }).publishedHours = 1;
+  });
 
-  try {
-    const run = runEvidenceAgent({ entityId: entity.id, query: "近 7 天正常吗" });
-
-    assert.equal(run.decision, "insufficient_evidence");
-    assert.deepEqual(run.calls.map((call) => call.name), [
-      "loadEntitySnapshot",
-      "checkSafetyGate",
-    ]);
-    assert.deepEqual(run.calls[1].evidence.map((item) => item.id), ["publish-age"]);
-  } finally {
-    entity.publishedHours = publishedHours;
-  }
+  const run = runEvidenceAgent({ entityId: entity.id, query: "近 7 天正常吗" });
+  assert.equal(run.decision, "expected");
+  assert.equal(run.evidence.find((item) => item.id === "window-coverage")?.value, true);
 });
 
-test("stops a safety flag without building an escalation packet", () => {
+test("cannot mutate a declared fixture to fabricate a policy flag", () => {
   const entity = SYNTHETIC_ENTITIES.find((item) => item.id === "content_steady")!;
-  const policyFlag = entity.policyFlag;
-  entity.policyFlag = true;
+  assert.throws(() => {
+    (entity as { policyFlag: boolean }).policyFlag = true;
+  });
 
-  try {
-    const run = runEvidenceAgent({ entityId: entity.id, query: "近 7 天正常吗" });
-
-    assert.equal(run.decision, "insufficient_evidence");
-    assert.deepEqual(run.calls.map((call) => call.name), [
-      "loadEntitySnapshot",
-      "checkSafetyGate",
-    ]);
-    assert.equal(run.calls.some((call) => call.name === "buildEscalationPacket"), false);
-  } finally {
-    entity.policyFlag = policyFlag;
-  }
+  const run = runEvidenceAgent({ entityId: entity.id, query: "近 7 天正常吗" });
+  assert.equal(run.decision, "expected");
+  assert.equal(run.calls.some((call) => call.name === "buildEscalationPacket"), false);
 });
 
 test("orders metric-attributed evidence without conditional calls", () => {
@@ -103,6 +112,7 @@ test("orders metric-attributed evidence without conditional calls", () => {
   ]);
   assert.deepEqual(run.evidence.map((item) => item.id), [
     "entity-snapshot",
+    "window-coverage",
     "data-completeness",
     "publish-age",
     "policy-flag",
@@ -132,6 +142,7 @@ test("checks unexplained Feed-share risk and builds one local packet", () => {
   ]);
   assert.deepEqual(run.evidence.map((item) => item.id), [
     "entity-snapshot",
+    "window-coverage",
     "data-completeness",
     "publish-age",
     "policy-flag",
@@ -168,43 +179,26 @@ test("scales healthy evidence only with scale intent", () => {
   assert.equal(scaleRun.calls.some((call) => call.name === "checkDistributionPath"), false);
 });
 
-test("stops after a blocked historical comparison", () => {
+test("cannot mutate a declared historical baseline", () => {
   const entity = SYNTHETIC_ENTITIES.find((item) => item.id === "content_steady")!;
-  const historicalExposureMedian = entity.historicalExposureMedian;
-  entity.historicalExposureMedian = 0;
+  assert.throws(() => {
+    (entity.windows[0] as { historicalExposureMedian: number }).historicalExposureMedian = 0;
+  });
 
-  try {
-    const run = runEvidenceAgent({ entityId: entity.id, query: "近 7 天正常吗" });
-
-    assert.equal(run.decision, "insufficient_evidence");
-    assert.deepEqual(run.calls.map((call) => call.name), [
-      "loadEntitySnapshot",
-      "checkSafetyGate",
-      "compareHistoricalBaseline",
-    ]);
-  } finally {
-    entity.historicalExposureMedian = historicalExposureMedian;
-  }
+  const run = runEvidenceAgent({ entityId: entity.id, query: "近 7 天正常吗" });
+  assert.equal(run.decision, "expected");
+  assert.equal(run.calls.some((call) => call.name === "compareHistoricalBaseline"), true);
 });
 
-test("stops after a blocked peer comparison", () => {
+test("cannot mutate a declared peer baseline", () => {
   const entity = SYNTHETIC_ENTITIES.find((item) => item.id === "content_steady")!;
-  const peerClickRate = entity.peerClickRate;
-  entity.peerClickRate = 0;
+  assert.throws(() => {
+    (entity.windows[0] as { peerClickRate: number }).peerClickRate = 0;
+  });
 
-  try {
-    const run = runEvidenceAgent({ entityId: entity.id, query: "近 7 天正常吗" });
-
-    assert.equal(run.decision, "insufficient_evidence");
-    assert.deepEqual(run.calls.map((call) => call.name), [
-      "loadEntitySnapshot",
-      "checkSafetyGate",
-      "compareHistoricalBaseline",
-      "comparePeerBenchmark",
-    ]);
-  } finally {
-    entity.peerClickRate = peerClickRate;
-  }
+  const run = runEvidenceAgent({ entityId: entity.id, query: "近 7 天正常吗" });
+  assert.equal(run.decision, "expected");
+  assert.equal(run.calls.some((call) => call.name === "comparePeerBenchmark"), true);
 });
 
 test("includes the exact boundary notes on every exit path", () => {
@@ -217,5 +211,15 @@ test("includes the exact boundary notes on every exit path", () => {
 
   for (const run of runs) {
     assert.deepEqual(run.boundaryNotes, BOUNDARY_NOTES);
+    assert.deepEqual(run.boundary, {
+      scope: "synthetic_only",
+      planner: "deterministic",
+      action: "none",
+      training: "none",
+      delivery: run.calls.some((call) => call.name === "buildEscalationPacket")
+        ? "not_sent"
+        : "none",
+      causal: "not_claimed",
+    });
   }
 });

@@ -42,5 +42,24 @@ test("maps supported Chinese time windows to days", () => {
 test("asks for a valid explicit time window", () => {
   const result = parseAgentRequest({ entityId: "content_steady", query: "近 0 天表现如何" });
 
-  assert.deepEqual(result.clarificationNeeded, ["Use a time window between 1 and 180 days."]);
+  assert.deepEqual(result.clarificationNeeded, ["Use a whole-number time window between 1 and 180 days."]);
+});
+
+test("rejects every explicit malformed or unsafe numeric time window", () => {
+  const queries = [
+    "近 -1 天表现如何",
+    "近 1.5 天表现如何",
+    "近 abc 天表现如何",
+    "近 999999999999999999999 天表现如何",
+  ];
+
+  for (const query of queries) {
+    const result = parseAgentRequest({ entityId: "content_steady", query });
+
+    assert.deepEqual(
+      result.clarificationNeeded,
+      ["Use a whole-number time window between 1 and 180 days."],
+      query,
+    );
+  }
 });

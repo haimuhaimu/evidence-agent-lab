@@ -1,13 +1,20 @@
 import type { Evidence } from "../core/types";
 import { getSyntheticEntity } from "../data/synthetic-entities";
-import type { Capability, SnapshotResult } from "./types";
+import type { Capability, SnapshotRequest, SnapshotResult } from "./types";
 
-export const loadEntitySnapshotCapability: Capability<string, SnapshotResult> = {
+export const loadEntitySnapshotCapability: Capability<SnapshotRequest, SnapshotResult> = {
   name: "loadEntitySnapshot",
-  run(entityId) {
+  run({ entityId, days }) {
     const declaredSnapshot = getSyntheticEntity(entityId);
     const snapshot = declaredSnapshot
-      ? Object.freeze({ ...declaredSnapshot })
+      ? Object.freeze({
+          id: declaredSnapshot.id,
+          source: declaredSnapshot.source,
+          publishedHours: declaredSnapshot.publishedHours,
+          policyFlag: declaredSnapshot.policyFlag,
+          requestedDays: days,
+          metrics: declaredSnapshot.windows.find((window) => window.days === days) ?? null,
+        })
       : undefined;
     const evidence: Evidence = snapshot
       ? {
@@ -43,6 +50,6 @@ export const loadEntitySnapshotCapability: Capability<string, SnapshotResult> = 
   },
 };
 
-export function loadEntitySnapshot(entityId: string): SnapshotResult {
-  return loadEntitySnapshotCapability.run(entityId);
+export function loadEntitySnapshot(input: SnapshotRequest): SnapshotResult {
+  return loadEntitySnapshotCapability.run(input);
 }

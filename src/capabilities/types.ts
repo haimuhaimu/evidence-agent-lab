@@ -15,6 +15,11 @@ export type SnapshotResult = {
   call: CapabilityCall;
 };
 
+export type SnapshotRequest = {
+  entityId: string;
+  days: number;
+};
+
 export type HistoricalComparison = {
   exposureDelta: number;
   call: CapabilityCall;

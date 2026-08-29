@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getSyntheticEntity } from "../data/synthetic-entities";
+import { loadEntitySnapshot } from "./load-entity-snapshot";
 import { checkDistributionPath } from "./check-distribution-path";
 
+function snapshot(entityId = "content_steady") {
+  return loadEntitySnapshot({ entityId, days: 7 }).snapshot!;
+}
+
 test("checks distribution only when observed metrics do not explain the drop", () => {
-  const snapshot = getSyntheticEntity("content_feed_drop")!;
-  const result = checkDistributionPath(snapshot, {
+  const result = checkDistributionPath(snapshot("content_feed_drop"), {
     primarySignal: "none",
     explainsExposureDrop: false,
   });
@@ -17,7 +20,7 @@ test("checks distribution only when observed metrics do not explain the drop", (
 });
 
 test("skips the synthetic distribution comparison after observed attribution", () => {
-  const result = checkDistributionPath(getSyntheticEntity("content_click_drop")!, {
+  const result = checkDistributionPath(snapshot("content_click_drop"), {
     primarySignal: "click_rate",
     explainsExposureDrop: true,
   });
@@ -29,7 +32,7 @@ test("skips the synthetic distribution comparison after observed attribution", (
 });
 
 test("watches a distribution path without a twenty percent feed-share drop", () => {
-  const result = checkDistributionPath(getSyntheticEntity("content_steady")!, {
+  const result = checkDistributionPath(snapshot(), {
     primarySignal: "none",
     explainsExposureDrop: false,
   });
@@ -40,12 +43,12 @@ test("watches a distribution path without a twenty percent feed-share drop", () 
 });
 
 test("treats a twenty percent synthetic feed-share drop as risk", () => {
-  const snapshot = {
-    ...getSyntheticEntity("content_steady")!,
-    feedShare: 0.24,
+  const alteredSnapshot = {
+    ...snapshot(),
+    metrics: { ...snapshot().metrics!, feedShare: 0.24 },
   };
 
-  const result = checkDistributionPath(snapshot, {
+  const result = checkDistributionPath(alteredSnapshot, {
     primarySignal: "none",
     explainsExposureDrop: false,
   });

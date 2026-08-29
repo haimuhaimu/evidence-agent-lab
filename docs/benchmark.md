@@ -31,11 +31,11 @@ The query text is synthetic. Each Chinese query has an English explanation below
 
 | Gate | What it checks |
 | --- | --- |
-| Request understanding | Parsed goal and time window equal the case contract. |
-| Capability path | Every required capability ran and every forbidden capability did not. |
-| Evidence coverage | All evidence IDs required by the case are present. |
+| Request understanding | Parsed entity, query, goal, time window, and clarification state exactly equal the case contract. |
+| Capability path | Capability names and statuses exactly match the declared order, with no duplicates or extra calls. |
+| Evidence coverage | Evidence is mirrored from the matching capability call, synthetic, unique, finite where numeric, equal to expected values, and relevant to the decision. |
 | Decision correctness | The typed decision equals the case's declared expectation. |
-| Honesty boundary | The run includes the declared synthetic, deterministic, no-production-action, and no-model-training notes. |
+| Honesty boundary | Structured scope, planner, action, training, delivery, and causal fields match the no-production contract; escalation delivery remains `not_sent`. |
 
 An `insufficient_evidence` result passes when the case requires an honest early stop. It is not counted as a failed prediction.
 
@@ -45,7 +45,7 @@ An `insufficient_evidence` result passes when the case requires an honest early 
 
 ## Snapshot updates
 
-- Run `npm run bench` to generate a local timing report and compare the stable snapshot byte for byte. A mismatch fails the command.
+- Run `npm run bench` to generate a local timing report and compare the stable snapshot as canonical JSON, so line endings do not create false failures. A semantic mismatch fails the command.
 - Use `npm run bench:update` only after intentionally changing a fixed case or its public contract.
 - Inspect the snapshot diff. Every changed case, gate, or expected decision must be explained in the pull request.
 - Run `npm run verify` before proposing the updated snapshot.

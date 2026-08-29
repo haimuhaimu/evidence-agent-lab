@@ -34,12 +34,21 @@ function compareMetric(
 export const comparePeerBenchmarkCapability: Capability<SyntheticEntitySnapshot, PeerComparison> = {
   name: "comparePeerBenchmark",
   run(snapshot) {
-    const exposure = compareMetric("exposure-vs-peer", snapshot.exposure, snapshot.peerExposureMedian);
-    const clickRate = compareMetric("click-rate-vs-peer", snapshot.clickRate, snapshot.peerClickRate);
+    const metrics = snapshot.metrics;
+    const exposure = compareMetric(
+      "exposure-vs-peer",
+      metrics?.exposure ?? Number.NaN,
+      metrics?.peerExposureMedian ?? Number.NaN,
+    );
+    const clickRate = compareMetric(
+      "click-rate-vs-peer",
+      metrics?.clickRate ?? Number.NaN,
+      metrics?.peerClickRate ?? Number.NaN,
+    );
     const completionRate = compareMetric(
       "completion-rate-vs-peer",
-      snapshot.completionRate,
-      snapshot.peerCompletionRate,
+      metrics?.completionRate ?? Number.NaN,
+      metrics?.peerCompletionRate ?? Number.NaN,
     );
     const comparisons = [exposure, clickRate, completionRate];
     const blocked = comparisons.some((comparison) => comparison.blocked);

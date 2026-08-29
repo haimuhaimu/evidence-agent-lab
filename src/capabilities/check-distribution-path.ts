@@ -35,11 +35,13 @@ export function checkDistributionPath(
     };
   }
 
-  const canCompare = snapshot.historicalFeedShare !== 0
-    && Number.isFinite(snapshot.historicalFeedShare)
-    && Number.isFinite(snapshot.feedShare);
+  const metrics = snapshot.metrics;
+  const canCompare = metrics !== null
+    && metrics.historicalFeedShare !== 0
+    && Number.isFinite(metrics.historicalFeedShare)
+    && Number.isFinite(metrics.feedShare);
   const feedShareDelta = canCompare
-    ? (snapshot.feedShare - snapshot.historicalFeedShare) / snapshot.historicalFeedShare
+    ? (metrics!.feedShare - metrics!.historicalFeedShare) / metrics!.historicalFeedShare
     : 0;
   const status = feedShareDelta <= -0.2 ? "risk" : "watch";
 

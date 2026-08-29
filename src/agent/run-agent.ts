@@ -32,6 +32,16 @@ function finishRun(
     unknowns: [...unknowns],
     falsification,
     boundaryNotes: [...BOUNDARY_NOTES],
+    boundary: {
+      scope: "synthetic_only",
+      planner: "deterministic",
+      action: "none",
+      training: "none",
+      delivery: calls.some((call) => call.name === "buildEscalationPacket")
+        ? "not_sent"
+        : "none",
+      causal: "not_claimed",
+    },
   };
 }
 
@@ -95,7 +105,10 @@ export function runEvidenceAgent(request: AgentRequest): AgentRun {
     return finishFromContext(parsed, [], context);
   }
 
-  const loaded = CAPABILITY_REGISTRY.loadEntitySnapshot(parsed.entityId);
+  const loaded = CAPABILITY_REGISTRY.loadEntitySnapshot({
+    entityId: parsed.entityId,
+    days: parsed.days,
+  });
   const calls = [loaded.call];
   if (!loaded.snapshot) {
     context.blocked = true;
@@ -133,7 +146,7 @@ export function runEvidenceAgent(request: AgentRequest): AgentRun {
     return finishFromContext(parsed, calls, context);
   }
 
-  const attribution = CAPABILITY_REGISTRY.attributeSignalDrop(loaded.snapshot);
+  const attribution = CAPABILITY_REGISTRY.attributeSignalDrop({ historical, peer });
   calls.push(attribution.call);
   if (attribution.call.status === "blocked") {
     context.blocked = true;

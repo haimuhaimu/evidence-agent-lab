@@ -16,13 +16,14 @@ flowchart TD
 
 ## Execution path
 
-1. The parser turns an entity ID and Chinese synthetic query into a diagnosis or scale intent and a supported time window.
+1. The parser turns an entity ID and Chinese synthetic query into a diagnosis or scale intent and a requested time window.
 2. The deterministic planner declares the capability order. It does not use free-form model reasoning.
-3. The runner calls the registry in order and stops when required evidence is unavailable or unsafe for the demo.
-4. Each capability returns a status, a reason, and typed synthetic evidence.
-5. The decision builder returns `expected`, `scale`, `intervene`, or `insufficient_evidence` from accumulated context.
-6. The UI renders the same request, evidence, unknowns, falsification condition, and trace. It contains no business decision rules.
-7. A reviewer may save a validated review record in the current browser. Reviews are not sent anywhere and do not alter the planner.
+3. The loader resolves only an exact declared 7-, 15-, 30-, or 90-day synthetic metric window; the runner stops with `window-coverage` evidence when that window is absent or publication age cannot cover it.
+4. The runner calls the registry in order and stops when required evidence is unavailable or unsafe for the demo. Signal attribution consumes the historical and peer results already recorded by the runner; it does not rerun those capabilities.
+5. Each capability returns a status, a reason, and typed synthetic evidence.
+6. The decision builder returns `expected`, `scale`, `intervene`, or `insufficient_evidence` from accumulated context.
+7. The UI renders the reviewed request, decision-relevant evidence, concrete unknowns, falsification condition, and trace. It contains no business decision rules, and feedback is disabled when the form differs from the last run.
+8. A reviewer may save a validated review record in the current browser. Reviews are not sent anywhere and do not alter the planner.
 
 ## Capabilities
 

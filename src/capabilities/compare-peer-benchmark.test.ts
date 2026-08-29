@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getSyntheticEntity } from "../data/synthetic-entities";
+import { loadEntitySnapshot } from "./load-entity-snapshot";
 import { compareHistoricalBaseline } from "./compare-historical-baseline";
 import { comparePeerBenchmark } from "./compare-peer-benchmark";
 
+function snapshot(entityId = "content_steady") {
+  return loadEntitySnapshot({ entityId, days: 7 }).snapshot!;
+}
+
 test("computes historical and peer deltas", () => {
-  const snapshot = getSyntheticEntity("content_click_drop")!;
-  const historical = compareHistoricalBaseline(snapshot);
-  const peer = comparePeerBenchmark(snapshot);
+  const entitySnapshot = snapshot("content_click_drop");
+  const historical = compareHistoricalBaseline(entitySnapshot);
+  const peer = comparePeerBenchmark(entitySnapshot);
 
   assert.equal(historical.exposureDelta < 0, true);
   assert.equal(peer.exposureDelta, -0.4);
@@ -22,13 +26,16 @@ test("computes historical and peer deltas", () => {
 });
 
 test("blocks zero peer baselines without non-finite outputs", () => {
-  const snapshot = {
-    ...getSyntheticEntity("content_steady")!,
-    peerExposureMedian: 0,
-    peerClickRate: 0,
-    peerCompletionRate: 0,
+  const alteredSnapshot = {
+    ...snapshot(),
+    metrics: {
+      ...snapshot().metrics!,
+      peerExposureMedian: 0,
+      peerClickRate: 0,
+      peerCompletionRate: 0,
+    },
   };
-  const result = comparePeerBenchmark(snapshot);
+  const result = comparePeerBenchmark(alteredSnapshot);
 
   assert.equal(result.call.status, "blocked");
   assert.deepEqual(result.call.evidence.map((item) => item.id), [
@@ -42,11 +49,11 @@ test("blocks zero peer baselines without non-finite outputs", () => {
 });
 
 test("truthfully explains a non-finite current peer metric", () => {
-  const snapshot = {
-    ...getSyntheticEntity("content_steady")!,
-    clickRate: Number.POSITIVE_INFINITY,
+  const alteredSnapshot = {
+    ...snapshot(),
+    metrics: { ...snapshot().metrics!, clickRate: Number.POSITIVE_INFINITY },
   };
-  const result = comparePeerBenchmark(snapshot);
+  const result = comparePeerBenchmark(alteredSnapshot);
   const clickEvidence = result.call.evidence.find((item) => item.id === "click-rate-vs-peer")!;
 
   assert.equal(result.call.status, "blocked");
