@@ -1,0 +1,32 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #fff;
+  color: #111;
+}
+
+main {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+}
+
+p,
+h1 {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2rem, 6vw, 4.5rem);
+}

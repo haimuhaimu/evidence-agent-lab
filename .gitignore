@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+artifacts/
+.env*
+.DS_Store
+.idea/
+.vscode/
+*.swp
