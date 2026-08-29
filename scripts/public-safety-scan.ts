@@ -62,6 +62,23 @@ function decodeUrlValue(value: string): string {
   }
 }
 
+function appendDecodedQueryComponents(
+  rawQuery: string,
+  decodedValues: string[],
+): void {
+  for (const parameter of rawQuery.split("&")) {
+    const equalsIndex = parameter.indexOf("=");
+    if (equalsIndex === -1) {
+      decodedValues.push(decodeUrlValue(parameter));
+    } else {
+      decodedValues.push(
+        decodeUrlValue(parameter.slice(0, equalsIndex)),
+        decodeUrlValue(parameter.slice(equalsIndex + 1)),
+      );
+    }
+  }
+}
+
 function localPathScanContent(content: string): string {
   const decodedValues: string[] = [];
   const contentWithoutWebRoutes = content.replace(
@@ -73,24 +90,22 @@ function localPathScanContent(content: string): string {
       if (queryIndex !== -1 && (fragmentIndex === -1 || queryIndex < fragmentIndex)) {
         const queryEnd = fragmentIndex === -1 ? urlText.length : fragmentIndex;
         const rawQuery = urlText.slice(queryIndex + 1, queryEnd);
-        for (const parameter of rawQuery.split("&")) {
-          const equalsIndex = parameter.indexOf("=");
-          if (equalsIndex === -1) {
-            decodedValues.push(decodeUrlValue(parameter));
-          } else {
-            decodedValues.push(
-              decodeUrlValue(parameter.slice(0, equalsIndex)),
-              decodeUrlValue(parameter.slice(equalsIndex + 1)),
-            );
-          }
-        }
+        appendDecodedQueryComponents(rawQuery, decodedValues);
       }
 
       if (fragmentIndex !== -1) {
         const decodedFragment = decodeUrlValue(
           urlText.slice(fragmentIndex + 1),
         );
-        if (!decodedFragment.startsWith("/")) {
+        if (decodedFragment.startsWith("/")) {
+          const routeQueryIndex = decodedFragment.indexOf("?");
+          if (routeQueryIndex !== -1) {
+            appendDecodedQueryComponents(
+              decodedFragment.slice(routeQueryIndex + 1),
+              decodedValues,
+            );
+          }
+        } else {
           decodedValues.push(decodedFragment);
         }
       }

@@ -236,6 +236,54 @@ test("ignores hash-router routes but scans explicit fragment data", () => {
   assert.ok(findings.every((item) => item.rule === "local-path"));
 });
 
+test("scans complete hash-route queries but ignores route pathnames", () => {
+  const findings = scanTrackedContent({
+    "fixtures/raw-route-query-path.txt":
+      "https://example.invalid/#/docs?path=/" + "Users/example/private",
+    "fixtures/encoded-route-query-path.txt":
+      "https://example.invalid/#%2Fdocs%3Fpath%3D%2FUsers%2Fexample%2Fprivate",
+    "fixtures/raw-route-query-file.txt":
+      "https://example.invalid/#/docs?next=file:///" + "home/example/private",
+    "fixtures/encoded-route-query-file.txt":
+      "https://example.invalid/#%2Fdocs%3Fnext%3Dfile%3A%2F%2F%2Fhome%2Fexample%2Fprivate",
+    "fixtures/raw-route-only.txt":
+      "https://example.invalid/#/Users/example/private",
+    "fixtures/encoded-route-only.txt":
+      "https://example.invalid/#%2Fhome%2Fexample%2Fprivate",
+  });
+
+  assert.deepEqual(
+    findings.map((item) => item.path).sort(),
+    [
+      "fixtures/encoded-route-query-file.txt",
+      "fixtures/encoded-route-query-path.txt",
+      "fixtures/raw-route-query-file.txt",
+      "fixtures/raw-route-query-path.txt",
+    ],
+  );
+  assert.ok(findings.every((item) => item.rule === "local-path"));
+});
+
+test("fails closed generically on malformed hash-route query escapes", () => {
+  const malformedContents = [
+    "https://example.invalid/#/docs?path=%ZZ",
+    "https://example.invalid/#%2Fdocs%3Fpath%3D%25ZZ",
+    "https://example.invalid/#%2Fdocs%3F%25ZZ%3Dsafe",
+    "https://example.invalid/#%2Fdocs%3F%25ZZ",
+  ];
+
+  for (const content of malformedContents) {
+    assert.throws(
+      () => scanTrackedContent({ "fixtures/malformed-route.txt": content }),
+      (error) => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.message, "malformed URL escape");
+        return true;
+      },
+    );
+  }
+});
+
 test("does not scan the documented deny-rule files", () => {
   const findings = scanTrackedContent({
     "scripts/public-safety-scan.ts": "ghp_" + "synthetic_example_token_123456",
