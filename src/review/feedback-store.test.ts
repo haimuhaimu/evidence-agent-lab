@@ -66,6 +66,22 @@ test("a correction requires a different target decision", () => {
   }));
 });
 
+test("rejects invalid runtime review choices and round-trips valid records", () => {
+  const invalidVerdict = {
+    ...reviewInput(),
+    verdict: "model_generated_verdict",
+  };
+  const invalidGroupFeedback = {
+    ...reviewInput(),
+    groupFeedback: "automatically_confirmed",
+  };
+  const validRecord = createReview(reviewInput());
+
+  assert.throws(() => createReview(invalidVerdict as never));
+  assert.throws(() => createReview(invalidGroupFeedback as never));
+  assert.deepEqual(parseReviewRecords(JSON.stringify([validRecord])), [validRecord]);
+});
+
 test("builds a run id from the reviewed run's request and decision", () => {
   assert.equal(buildRunId(CLICK_DROP_RUN), "content_click_drop:7:diagnose:intervene");
 });

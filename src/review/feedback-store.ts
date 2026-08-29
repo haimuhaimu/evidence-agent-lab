@@ -76,6 +76,10 @@ export function createReview(input: CreateReviewInput): ReviewRecord {
   const runId = buildRunId(input.run);
   const originalDecision = input.run.decision;
 
+  if (!isVerdict(input.verdict) || !isGroupFeedback(input.groupFeedback)) {
+    throw new Error("Review verdict and group feedback must be declared values.");
+  }
+
   if (!hasText(input.note) || !hasText(input.createdAt)) {
     throw new Error("Review notes and timestamps must be provided.");
   }

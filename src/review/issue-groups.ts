@@ -13,7 +13,9 @@ export function groupConfirmedIssues(records: readonly ReviewRecord[]): IssueGro
 
     const recordIds = groupedIds.get(record.fingerprint);
     if (recordIds) {
-      recordIds.push(record.id);
+      if (!recordIds.includes(record.id)) {
+        recordIds.push(record.id);
+      }
     } else {
       groupedIds.set(record.fingerprint, [record.id]);
     }

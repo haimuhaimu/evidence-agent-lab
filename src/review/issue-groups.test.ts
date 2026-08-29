@@ -47,6 +47,14 @@ test("groups only human-confirmed matching fingerprints", () => {
   assert.deepEqual(groups[0].recordIds, [confirmedA.id, confirmedB.id]);
 });
 
+test("requires two distinct confirmed record ids before grouping", () => {
+  assert.deepEqual(groupConfirmedIssues([confirmedA, confirmedA]), []);
+  assert.deepEqual(groupConfirmedIssues([confirmedA, confirmedB]), [{
+    fingerprint: confirmedA.fingerprint,
+    recordIds: [confirmedA.id, confirmedB.id],
+  }]);
+});
+
 test("does not treat accurate reviews as issue confirmations", () => {
   const accurate = createReview({
     run: runEvidenceAgent({
