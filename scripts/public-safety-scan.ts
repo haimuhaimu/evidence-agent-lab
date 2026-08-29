@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
+import { lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { TextDecoder } from "node:util";
 
 export type SafetyFinding = {
   path: string;
@@ -22,16 +23,18 @@ const credentialShapes = [
   /\bgithub_pat_[A-Za-z0-9_]{20,}\b/,
   /\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b/,
   /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/,
-  /\baws_secret_access_key\s*[:=]\s*["']?[A-Za-z0-9/+=]{32,}/i,
-  /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/,
+  /\b(?:aws[_-]?secret[_-]?access[_-]?key|secretaccesskey)\b["']?\s*[:=]\s*["']?[A-Za-z0-9/+=]{24,}/i,
+  /-----BEGIN (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----/,
   /\b(?:cookie|set-cookie)\s*:\s*[^\r\n]{8,}/i,
   /\bbearer\s+[A-Za-z0-9._~+/=-]{16,}/i,
 ];
 
 const localPathShapes = [
-  /\/(?:Users|home)\/[^/\s]+(?:\/|\b)/,
-  /\/root(?:\/|\b)/,
-  /\b[A-Za-z]:\\Users\\[^\\\s]+(?:\\|\b)/i,
+  /(?:^|[\s"'`=:(])\/(?:Users|home)\/[^/\s"'`<>]+(?:\/|(?=$|[\s"'`<>]))/m,
+  /(?:^|[\s"'`=:(])\/root(?:\/|(?=$|[\s"'`<>]))/m,
+  /\bfile:\/\/\/(?:Users|home)\/[^/\s"'`<>]+(?:\/|(?=$|[\s"'`<>]))/i,
+  /\bfile:\/\/\/root(?:\/|(?=$|[\s"'`<>]))/i,
+  /(?:^|[\s"'`=:(])[A-Za-z]:[\\/]Users[\\/][^\\/\s"'`<>]+(?:[\\/]|(?=$|[\s"'`<>]))/im,
 ];
 
 const internalSourceMarkers = [
@@ -44,8 +47,42 @@ const internalSourceMarkers = [
 
 const realIdentityShapes = [
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
-  /\+\d{1,3}(?:[ .-]?\d){7,14}\b/,
+  /(?:mobile|phone|tel(?:ephone)?|contact|手机|电话|联系电话)\s*[:=：]?\s*\+\d{1,3}(?:[ .-]?\d){7,14}\b/i,
+  /(?:mobile|phone|tel(?:ephone)?|contact|手机|电话|联系电话)\s*[:=：]?\s*(?:\+?86[ -]?)?1[3-9]\d{9}\b/i,
+  /(?:phone|tel(?:ephone)?|contact|电话|联系电话)\s*[:=：]?\s*\(0\d{2,3}\)[ -]?\d{3,4}[ -]?\d{4}\b/i,
 ];
+
+const classificationSampleBytes = 64 * 1024;
+
+function isBinaryContent(data: Buffer): boolean {
+  const sample = data.subarray(0, classificationSampleBytes);
+  if (sample.length === 0) {
+    return false;
+  }
+  if (sample.includes(0)) {
+    return true;
+  }
+
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(sample, {
+      stream: data.length > sample.length,
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return true;
+    }
+    throw error;
+  }
+
+  let controlBytes = 0;
+  for (const byte of sample) {
+    if ((byte < 32 && byte !== 9 && byte !== 10 && byte !== 13) || byte === 127) {
+      controlBytes += 1;
+    }
+  }
+
+  return controlBytes / sample.length > 0.1;
+}
 
 export function scanTrackedContent(
   files: Readonly<Record<string, string>>,
@@ -63,7 +100,11 @@ export function scanTrackedContent(
     if (credentialShapes.some((shape) => shape.test(content))) {
       rules.add("credential-shape");
     }
-    if (localPathShapes.some((shape) => shape.test(content))) {
+    const contentWithoutWebUrls = content.replace(
+      /\bhttps?:\/\/[^\s"'`<>]+/gi,
+      "",
+    );
+    if (localPathShapes.some((shape) => shape.test(contentWithoutWebUrls))) {
       rules.add("local-path");
     }
     if (internalSourceMarkers.some((marker) => normalizedContent.includes(marker))) {
@@ -97,8 +138,17 @@ function loadTrackedTextFiles(): Record<string, string> {
       continue;
     }
 
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink()) {
+      files[path] = readlinkSync(path, "utf8");
+      continue;
+    }
+    if (!stat.isFile()) {
+      throw new Error("tracked path is not a file or symbolic link");
+    }
+
     const data = readFileSync(path);
-    if (data.includes(0)) {
+    if (isBinaryContent(data)) {
       continue;
     }
     files[path] = data.toString("utf8");

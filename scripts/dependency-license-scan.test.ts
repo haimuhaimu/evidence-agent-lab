@@ -95,8 +95,8 @@ test("covers each denied production license family", () => {
   assert.ok(findings.every((item) => item.rule === "denied-license"));
 });
 
-test("accepts the explicitly permitted license set", () => {
-  const permittedLicenses = [
+test("accepts the repository's base license expression set", () => {
+  const acceptedLicenses = [
     "MIT",
     "ISC",
     "BSD-2-Clause",
@@ -108,8 +108,8 @@ test("accepts the explicitly permitted license set", () => {
     "Unlicense",
   ];
   const packages = Object.fromEntries(
-    permittedLicenses.map((license, index) => [
-      `node_modules/synthetic-permitted-${index}`,
+    acceptedLicenses.map((license, index) => [
+      `node_modules/synthetic-accepted-${index}`,
       { version: "1.0.0", dev: false, license },
     ]),
   );
@@ -117,9 +117,144 @@ test("accepts the explicitly permitted license set", () => {
   assert.deepEqual(scanDependencyLicenses({ packages }), []);
 });
 
+test("accepts only locally verified package version expression tuples", () => {
+  const findings = scanDependencyLicenses({
+    packages: {
+      "node_modules/caniuse-lite": {
+        version: "1.0.30001810",
+        license: "CC-BY-4.0",
+      },
+      "node_modules/@img/sharp-libvips-linux-x64": {
+        version: "1.2.4",
+        optional: true,
+        license: "LGPL-3.0-or-later",
+      },
+      "node_modules/@img/sharp-win32-x64": {
+        version: "0.34.5",
+        optional: true,
+        license: "Apache-2.0 AND LGPL-3.0-or-later",
+      },
+      "node_modules/@img/sharp-wasm32": {
+        version: "0.34.5",
+        optional: true,
+        license: "Apache-2.0 AND LGPL-3.0-or-later AND MIT",
+      },
+    },
+  });
+
+  assert.deepEqual(findings, []);
+});
+
+test("denies every non-empty expression outside the exact accepted set", () => {
+  const rejectedLicenses = [
+    "UNLICENSED",
+    "Proprietary",
+    "synthetic-free-form",
+    "Unknown-SPDX-1.0",
+    "MIT OR Apache-2.0",
+    "LGPL-3.0-only",
+    "LGPL-3.0-or-later",
+    "Apache-2.0 AND MIT",
+  ];
+  const packages = Object.fromEntries(
+    rejectedLicenses.map((license, index) => [
+      `node_modules/synthetic-unknown-${index}`,
+      { version: "1.0.0", dev: false, license },
+    ]),
+  );
+
+  const findings = scanDependencyLicenses({ packages });
+
+  assert.deepEqual(
+    findings.map((item) => item.license),
+    rejectedLicenses,
+  );
+  assert.ok(findings.every((item) => item.rule === "denied-license"));
+});
+
+test("denies a verified expression when its package version is not verified", () => {
+  const findings = scanDependencyLicenses({
+    packages: {
+      "node_modules/caniuse-lite": {
+        version: "0.0.0-synthetic",
+        license: "CC-BY-4.0",
+      },
+    },
+  });
+
+  assert.deepEqual(findings.map((item) => item.rule), ["denied-license"]);
+});
+
 test("fails closed when package metadata is unavailable", () => {
   assert.throws(
     () => scanDependencyLicenses({}),
     /lockfile packages are required/,
   );
+});
+
+test("resolves a workspace link once and preserves nested scoped names", () => {
+  const findings = scanDependencyLicenses({
+    packages: {
+      "": { name: "root", version: "0.1.0", license: "MIT" },
+      "packages/synthetic-workspace": {
+        name: "@synthetic/workspace",
+        version: "1.2.3",
+        license: "Synthetic-Workspace-License",
+      },
+      "node_modules/@synthetic/workspace": {
+        resolved: "packages/synthetic-workspace",
+        link: true,
+      },
+      "node_modules/outer/node_modules/@synthetic/blocked": {
+        version: "2.0.0",
+        license: "Synthetic-Nested-License",
+      },
+    },
+  });
+
+  assert.deepEqual(findings, [
+    {
+      packageName: "@synthetic/workspace",
+      version: "1.2.3",
+      license: "Synthetic-Workspace-License",
+      rule: "denied-license",
+    },
+    {
+      packageName: "@synthetic/blocked",
+      version: "2.0.0",
+      license: "Synthetic-Nested-License",
+      rule: "denied-license",
+    },
+  ]);
+});
+
+test("fails closed for absent invalid cyclic or escaping workspace links", () => {
+  const invalidLockfiles = [
+    {
+      packages: {
+        "node_modules/synthetic": { link: true, resolved: "packages/missing" },
+      },
+    },
+    {
+      packages: {
+        "node_modules/synthetic": { link: true, resolved: 42 },
+      },
+    },
+    {
+      packages: {
+        "node_modules/a": { link: true, resolved: "node_modules/b" },
+        "node_modules/b": { link: true, resolved: "node_modules/a" },
+      },
+    },
+    {
+      packages: {
+        "node_modules/synthetic": { link: true, resolved: "../outside" },
+        "../outside": { name: "outside", license: "MIT" },
+      },
+    },
+  ];
+
+  for (const lockfile of invalidLockfiles) {
+    assert.throws(() => scanDependencyLicenses(lockfile), /lockfile link/);
+  }
 });
