@@ -1,0 +1,57 @@
+name: Synthetic benchmark case
+description: Propose one fixed case that extends an explicit public contract.
+title: "[Case] "
+labels: [benchmark]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Proposals must use newly authored synthetic data. Do not submit private data, real identifiers, production records, or identifying screenshots.
+  - type: input
+    id: case-id
+    attributes:
+      label: Synthetic case ID
+      description: Use a short, unique, English identifier.
+      placeholder: example_boundary_case
+    validations:
+      required: true
+  - type: textarea
+    id: query
+    attributes:
+      label: Synthetic query and English explanation
+      description: If the query is Chinese, explain its intent and time window in English.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Expected contract
+      description: State the parsed intent, required and forbidden capabilities, evidence IDs, decision, and honesty boundary.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction commands
+      description: Show how maintainers can run the focused test and benchmark locally.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Synthetic provenance
+      description: Explain how the fixture was newly authored and why it cannot identify a real person or organization.
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Boundary check
+      options:
+        - label: This proposal adds a fixed case before expanding behavior.
+          required: true
+        - label: This proposal makes no production, training, uplift, notification, or calibration claim.
+          required: true
+        - label: I included no private data, credentials, real records, or local paths.
+          required: true
