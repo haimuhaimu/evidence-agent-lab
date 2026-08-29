@@ -144,6 +144,50 @@ test("does not confuse ordinary web routes with credible local paths", () => {
   assert.ok(findings.every((item) => item.rule === "local-path"));
 });
 
+test("scans decoded URL query and fragment values but not route segments", () => {
+  const findings = scanTrackedContent({
+    "fixtures/route-home.txt": "https://example.invalid/home/docs",
+    "fixtures/route-users.txt": "https://example.invalid/Users/docs",
+    "fixtures/route-root.txt": "https://example.invalid/root/docs",
+    "fixtures/raw-query.txt":
+      "https://example.invalid/docs?file=/" + "Users/example/private",
+    "fixtures/encoded-query.txt":
+      "https://example.invalid/docs?path=%2Fhome%2Fexample%2Fprivate",
+    "fixtures/nested-file-query.txt":
+      "https://example.invalid/docs?next=file%3A%2F%2F%2FUsers%2Fexample%2Fprivate",
+    "fixtures/raw-fragment.txt":
+      "https://example.invalid/docs#file:///" + "home/example/private",
+    "fixtures/encoded-fragment.txt":
+      "https://example.invalid/docs#path=file%3A%2F%2F%2Froot%2Fprivate",
+  });
+
+  assert.deepEqual(
+    findings.map((item) => item.path).sort(),
+    [
+      "fixtures/encoded-fragment.txt",
+      "fixtures/encoded-query.txt",
+      "fixtures/nested-file-query.txt",
+      "fixtures/raw-fragment.txt",
+      "fixtures/raw-query.txt",
+    ],
+  );
+  assert.ok(findings.every((item) => item.rule === "local-path"));
+});
+
+test("fails closed on malformed URL parameter or fragment escapes", () => {
+  const malformedContents = [
+    "https://example.invalid/docs?file=%E0%A4%A",
+    "https://example.invalid/docs#path=%ZZ%2FUsers%2Fexample",
+  ];
+
+  for (const content of malformedContents) {
+    assert.throws(
+      () => scanTrackedContent({ "fixtures/malformed-url.txt": content }),
+      /malformed URL escape/,
+    );
+  }
+});
+
 test("does not scan the documented deny-rule files", () => {
   const findings = scanTrackedContent({
     "scripts/public-safety-scan.ts": "ghp_" + "synthetic_example_token_123456",
@@ -182,6 +226,41 @@ test("detects contextual domestic phones without flagging bare numeric ids", () 
     ["fixtures/local-phone.txt", "fixtures/mobile.txt"],
   );
   assert.ok(findings.every((item) => item.rule === "real-identity"));
+});
+
+test("detects distinctive international and contextual common phone forms", () => {
+  const findings = scanTrackedContent({
+    "fixtures/international.txt":
+      "reach the synthetic desk at +" + "1 (415) 555-0123",
+    "fixtures/us-hyphen.txt": "phone: " + "415-555-0123",
+    "fixtures/us-parenthesized.txt": "tel: " + "(415) 555-0123",
+    "fixtures/chinese-mobile.txt": "手机：" + "199" + "00000000",
+  });
+
+  assert.deepEqual(
+    findings.map((item) => item.path).sort(),
+    [
+      "fixtures/chinese-mobile.txt",
+      "fixtures/international.txt",
+      "fixtures/us-hyphen.txt",
+      "fixtures/us-parenthesized.txt",
+    ],
+  );
+  assert.ok(findings.every((item) => item.rule === "real-identity"));
+});
+
+test("requires a complete context-label token for ambiguous phone forms", () => {
+  const findings = scanTrackedContent({
+    "fixtures/microphone.txt": "microphone: " + "199" + "00000000",
+    "fixtures/suffix-label.txt": "xphone: " + "(010) 5555-0123",
+    "fixtures/cjk-suffix-label.txt": "合成phone: " + "415-555-0123",
+    "fixtures/bare-us.txt": "account_id=415-555-0123",
+    "fixtures/bare-mobile.txt": "order_id=" + "199" + "00000000",
+    "fixtures/embedded-plus.txt": "id+" + "1 (415) 555-0123",
+    "fixtures/cjk-embedded-plus.txt": "编号+" + "1 (415) 555-0123",
+  });
+
+  assert.deepEqual(findings, []);
 });
 
 test("never dereferences a tracked symlink outside the repository", () => {

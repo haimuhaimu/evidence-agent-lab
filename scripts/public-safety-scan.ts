@@ -47,12 +47,50 @@ const internalSourceMarkers = [
 
 const realIdentityShapes = [
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
-  /(?:mobile|phone|tel(?:ephone)?|contact|手机|电话|联系电话)\s*[:=：]?\s*\+\d{1,3}(?:[ .-]?\d){7,14}\b/i,
-  /(?:mobile|phone|tel(?:ephone)?|contact|手机|电话|联系电话)\s*[:=：]?\s*(?:\+?86[ -]?)?1[3-9]\d{9}\b/i,
-  /(?:phone|tel(?:ephone)?|contact|电话|联系电话)\s*[:=：]?\s*\(0\d{2,3}\)[ -]?\d{3,4}[ -]?\d{4}\b/i,
+  /(?:^|[^\w\u3400-\u9fff])\+\d{1,3}(?:[ .()-]{0,3}\d){7,14}(?![\w\u3400-\u9fff])/i,
+  /(?:^|[^\w\u3400-\u9fff])(?:mobile|phone|tel(?:ephone)?|contact|手机|电话|联系电话)\s*[:=：]\s*(?:\+?86[ -]?)?1[3-9]\d{9}(?![\w\u3400-\u9fff])/i,
+  /(?:^|[^\w\u3400-\u9fff])(?:mobile|phone|tel(?:ephone)?|contact|手机|电话|联系电话)\s*[:=：]\s*(?:\(\d{3,4}\)|\d{3})[ .-]\d{3,4}[ .-]\d{4}(?![\w\u3400-\u9fff])/i,
 ];
 
 const classificationSampleBytes = 64 * 1024;
+
+function decodeUrlValue(value: string): string {
+  try {
+    return decodeURIComponent(value.replace(/\+/g, " "));
+  } catch {
+    throw new Error("malformed URL escape");
+  }
+}
+
+function localPathScanContent(content: string): string {
+  const decodedValues: string[] = [];
+  const contentWithoutWebRoutes = content.replace(
+    /\bhttps?:\/\/[^\s"'`<>]+/gi,
+    (urlText) => {
+      const fragmentIndex = urlText.indexOf("#");
+      const queryIndex = urlText.indexOf("?");
+
+      if (queryIndex !== -1 && (fragmentIndex === -1 || queryIndex < fragmentIndex)) {
+        const queryEnd = fragmentIndex === -1 ? urlText.length : fragmentIndex;
+        const rawQuery = urlText.slice(queryIndex + 1, queryEnd);
+        for (const parameter of rawQuery.split("&")) {
+          const equalsIndex = parameter.indexOf("=");
+          if (equalsIndex !== -1) {
+            decodedValues.push(decodeUrlValue(parameter.slice(equalsIndex + 1)));
+          }
+        }
+      }
+
+      if (fragmentIndex !== -1) {
+        decodedValues.push(decodeUrlValue(urlText.slice(fragmentIndex + 1)));
+      }
+
+      return "";
+    },
+  );
+
+  return [contentWithoutWebRoutes, ...decodedValues].join("\n");
+}
 
 function isBinaryContent(data: Buffer): boolean {
   const sample = data.subarray(0, classificationSampleBytes);
@@ -100,11 +138,8 @@ export function scanTrackedContent(
     if (credentialShapes.some((shape) => shape.test(content))) {
       rules.add("credential-shape");
     }
-    const contentWithoutWebUrls = content.replace(
-      /\bhttps?:\/\/[^\s"'`<>]+/gi,
-      "",
-    );
-    if (localPathShapes.some((shape) => shape.test(contentWithoutWebUrls))) {
+    const contentForLocalPathScan = localPathScanContent(content);
+    if (localPathShapes.some((shape) => shape.test(contentForLocalPathScan))) {
       rules.add("local-path");
     }
     if (internalSourceMarkers.some((marker) => normalizedContent.includes(marker))) {
