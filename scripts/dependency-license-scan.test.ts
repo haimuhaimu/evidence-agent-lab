@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { scanDependencyLicenses } from "./dependency-license-scan.ts";
+import { scanDependencyLicenses } from "./dependency-license-scan";
 
 test("rejects strong-copyleft and unknown production licenses", () => {
   const findings = scanDependencyLicenses({
@@ -125,17 +125,17 @@ test("accepts only locally verified package version expression tuples", () => {
         license: "CC-BY-4.0",
       },
       "node_modules/@img/sharp-libvips-linux-x64": {
-        version: "1.2.4",
+        version: "1.3.3",
         optional: true,
         license: "LGPL-3.0-or-later",
       },
       "node_modules/@img/sharp-win32-x64": {
-        version: "0.34.5",
+        version: "0.35.4",
         optional: true,
         license: "Apache-2.0 AND LGPL-3.0-or-later",
       },
       "node_modules/@img/sharp-wasm32": {
-        version: "0.34.5",
+        version: "0.35.4",
         optional: true,
         license: "Apache-2.0 AND LGPL-3.0-or-later AND MIT",
       },
@@ -179,10 +179,27 @@ test("denies a verified expression when its package version is not verified", ()
         version: "0.0.0-synthetic",
         license: "CC-BY-4.0",
       },
+      "node_modules/@img/sharp-libvips-linux-x64": {
+        version: "0.0.0-synthetic",
+        license: "LGPL-3.0-or-later",
+      },
+      "node_modules/@img/sharp-win32-x64": {
+        version: "0.0.0-synthetic",
+        license: "Apache-2.0 AND LGPL-3.0-or-later",
+      },
+      "node_modules/@img/sharp-wasm32": {
+        version: "0.0.0-synthetic",
+        license: "Apache-2.0 AND LGPL-3.0-or-later AND MIT",
+      },
     },
   });
 
-  assert.deepEqual(findings.map((item) => item.rule), ["denied-license"]);
+  assert.deepEqual(findings.map((item) => item.rule), [
+    "denied-license",
+    "denied-license",
+    "denied-license",
+    "denied-license",
+  ]);
 });
 
 test("fails closed when package metadata is unavailable", () => {

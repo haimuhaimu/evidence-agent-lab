@@ -12,7 +12,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { scanTrackedContent } from "./public-safety-scan.ts";
+import { scanTrackedContent } from "./public-safety-scan";
 
 const scannerPath = fileURLToPath(new URL("./public-safety-scan.ts", import.meta.url));
 const tsxImport = import.meta.resolve("tsx");
