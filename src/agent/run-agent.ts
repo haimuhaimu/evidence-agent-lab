@@ -1,0 +1,178 @@
+import { CAPABILITY_REGISTRY } from "../capabilities/registry";
+import type {
+  AgentRequest,
+  AgentRun,
+  CapabilityCall,
+  Decision,
+  ParsedRequest,
+} from "../core/types";
+import { buildDecision, type DecisionContext } from "./build-decision";
+import { parseAgentRequest } from "./parse-request";
+import { planCapabilities } from "./plan-capabilities";
+
+const BOUNDARY_NOTES = [
+  "Uses synthetic data only.",
+  "Uses a deterministic planner, not free-form model reasoning.",
+  "No production action was taken.",
+  "No model training occurred.",
+];
+
+function finishRun(
+  request: ParsedRequest,
+  calls: CapabilityCall[],
+  decision: Decision,
+  unknowns: string[],
+  falsification: string[],
+): AgentRun {
+  return {
+    request,
+    calls,
+    decision,
+    evidence: calls.flatMap((call) => call.evidence),
+    unknowns: [...unknowns],
+    falsification,
+    boundaryNotes: [...BOUNDARY_NOTES],
+  };
+}
+
+function buildFalsification(
+  decision: Decision,
+  context: DecisionContext,
+): string[] {
+  if (decision === "insufficient_evidence") {
+    return context.unknowns.length > 0
+      ? ["Resolve the listed evidence gaps, then rerun the same synthetic checks."]
+      : ["Pass the blocked synthetic evidence gate before drawing a conclusion."];
+  }
+
+  if (decision === "intervene") {
+    if (context.distributionRisk) {
+      return ["The classification would change if synthetic Feed share rose above the demo risk threshold."];
+    }
+
+    return ["The classification would change if the observed metric and exposure no longer crossed the demo thresholds."];
+  }
+
+  if (decision === "scale") {
+    return ["The decision would change if exposure growth fell below 10% or either peer metric delta turned negative."];
+  }
+
+  return ["The decision would change if the synthetic evidence crossed a declared risk or scale threshold."];
+}
+
+function finishFromContext(
+  request: ParsedRequest,
+  calls: CapabilityCall[],
+  context: DecisionContext,
+): AgentRun {
+  const decision = buildDecision(context);
+
+  return finishRun(
+    request,
+    calls,
+    decision,
+    context.unknowns,
+    buildFalsification(decision, context),
+  );
+}
+
+export function runEvidenceAgent(request: AgentRequest): AgentRun {
+  const parsed = parseAgentRequest(request);
+  const planned = planCapabilities(parsed, undefined);
+  const context: DecisionContext = {
+    blocked: false,
+    unknowns: [...parsed.clarificationNeeded],
+    policyFlag: false,
+    attributedRisk: false,
+    distributionRisk: false,
+    goal: parsed.goal,
+    exposureDelta: 0,
+    clickPeerDelta: 0,
+    completionPeerDelta: 0,
+  };
+
+  if (planned.length === 0) {
+    return finishFromContext(parsed, [], context);
+  }
+
+  const loaded = CAPABILITY_REGISTRY.loadEntitySnapshot(parsed.entityId);
+  const calls = [loaded.call];
+  if (!loaded.snapshot) {
+    context.blocked = true;
+    context.unknowns.push(loaded.call.reason);
+    return finishFromContext(parsed, calls, context);
+  }
+
+  context.policyFlag = loaded.snapshot.policyFlag;
+  const safety = CAPABILITY_REGISTRY.checkSafetyGate(loaded.snapshot);
+  calls.push(safety);
+  if (safety.status === "blocked") {
+    context.blocked = true;
+    if (!loaded.snapshot.policyFlag) {
+      context.unknowns.push(safety.reason);
+    }
+    return finishFromContext(parsed, calls, context);
+  }
+
+  const historical = CAPABILITY_REGISTRY.compareHistoricalBaseline(loaded.snapshot);
+  calls.push(historical.call);
+  context.exposureDelta = historical.exposureDelta;
+  if (historical.call.status === "blocked") {
+    context.blocked = true;
+    context.unknowns.push(historical.call.reason);
+    return finishFromContext(parsed, calls, context);
+  }
+
+  const peer = CAPABILITY_REGISTRY.comparePeerBenchmark(loaded.snapshot);
+  calls.push(peer.call);
+  context.clickPeerDelta = peer.clickRateDelta;
+  context.completionPeerDelta = peer.completionRateDelta;
+  if (peer.call.status === "blocked") {
+    context.blocked = true;
+    context.unknowns.push(peer.call.reason);
+    return finishFromContext(parsed, calls, context);
+  }
+
+  const attribution = CAPABILITY_REGISTRY.attributeSignalDrop(loaded.snapshot);
+  calls.push(attribution.call);
+  if (attribution.call.status === "blocked") {
+    context.blocked = true;
+    context.unknowns.push(attribution.call.reason);
+    return finishFromContext(parsed, calls, context);
+  }
+
+  context.attributedRisk = attribution.explainsExposureDrop;
+
+  if (historical.exposureDelta < 0 && !attribution.explainsExposureDrop) {
+    const distribution = CAPABILITY_REGISTRY.checkDistributionPath(
+      loaded.snapshot,
+      attribution,
+    );
+    calls.push(distribution.call);
+    if (distribution.call.status === "blocked") {
+      context.blocked = true;
+      context.unknowns.push(distribution.call.reason);
+      return finishFromContext(parsed, calls, context);
+    }
+
+    context.distributionRisk = distribution.status === "risk";
+  }
+
+  const decision = buildDecision(context);
+  if (
+    decision === "intervene"
+    && (context.distributionRisk || context.policyFlag)
+  ) {
+    const evidenceIds = calls.flatMap((call) => call.evidence.map((item) => item.id));
+    const packet = CAPABILITY_REGISTRY.buildEscalationPacket(parsed.entityId, evidenceIds);
+    calls.push(packet.call);
+  }
+
+  return finishRun(
+    parsed,
+    calls,
+    decision,
+    context.unknowns,
+    buildFalsification(decision, context),
+  );
+}
