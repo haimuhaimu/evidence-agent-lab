@@ -47,9 +47,9 @@ const internalSourceMarkers = [
 
 const realIdentityShapes = [
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
-  /(?:^|[^\w\u3400-\u9fff])\+\d{1,3}(?:[ .()-]{0,3}\d){7,14}(?![\w\u3400-\u9fff])/i,
-  /(?:^|[^\w\u3400-\u9fff])(?:mobile|phone|tel(?:ephone)?|contact|手机|电话|联系电话)\s*[:=：]\s*(?:\+?86[ -]?)?1[3-9]\d{9}(?![\w\u3400-\u9fff])/i,
-  /(?:^|[^\w\u3400-\u9fff])(?:mobile|phone|tel(?:ephone)?|contact|手机|电话|联系电话)\s*[:=：]\s*(?:\(\d{3,4}\)|\d{3})[ .-]\d{3,4}[ .-]\d{4}(?![\w\u3400-\u9fff])/i,
+  /(?:^|[^\p{L}\p{N}\p{M}\p{Pc}])\+\d(?:[ .()-]{0,3}\d){7,14}(?![ .()-]{0,3}\d)(?![\p{L}\p{N}\p{M}\p{Pc}])/iu,
+  /(?:^|[^\p{L}\p{N}\p{M}\p{Pc}])(?:mobile|phone|tel(?:ephone)?|contact|手机|电话|联系电话)\s*[:=：]\s*(?:\+?86[ -]?)?1[3-9]\d{9}(?![\p{L}\p{N}\p{M}\p{Pc}])/iu,
+  /(?:^|[^\p{L}\p{N}\p{M}\p{Pc}])(?:mobile|phone|tel(?:ephone)?|contact|手机|电话|联系电话)\s*[:=：]\s*(?:\(\d{3,4}\)|\d{3})[ .-]\d{3,4}[ .-]\d{4}(?![\p{L}\p{N}\p{M}\p{Pc}])/iu,
 ];
 
 const classificationSampleBytes = 64 * 1024;
@@ -75,14 +75,24 @@ function localPathScanContent(content: string): string {
         const rawQuery = urlText.slice(queryIndex + 1, queryEnd);
         for (const parameter of rawQuery.split("&")) {
           const equalsIndex = parameter.indexOf("=");
-          if (equalsIndex !== -1) {
-            decodedValues.push(decodeUrlValue(parameter.slice(equalsIndex + 1)));
+          if (equalsIndex === -1) {
+            decodedValues.push(decodeUrlValue(parameter));
+          } else {
+            decodedValues.push(
+              decodeUrlValue(parameter.slice(0, equalsIndex)),
+              decodeUrlValue(parameter.slice(equalsIndex + 1)),
+            );
           }
         }
       }
 
       if (fragmentIndex !== -1) {
-        decodedValues.push(decodeUrlValue(urlText.slice(fragmentIndex + 1)));
+        const decodedFragment = decodeUrlValue(
+          urlText.slice(fragmentIndex + 1),
+        );
+        if (!decodedFragment.startsWith("/")) {
+          decodedValues.push(decodedFragment);
+        }
       }
 
       return "";

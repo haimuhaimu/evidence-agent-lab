@@ -177,6 +177,8 @@ test("scans decoded URL query and fragment values but not route segments", () =>
 test("fails closed on malformed URL parameter or fragment escapes", () => {
   const malformedContents = [
     "https://example.invalid/docs?file=%E0%A4%A",
+    "https://example.invalid/docs?%ZZ=value",
+    "https://example.invalid/docs?%E0%A4%A",
     "https://example.invalid/docs#path=%ZZ%2FUsers%2Fexample",
   ];
 
@@ -186,6 +188,52 @@ test("fails closed on malformed URL parameter or fragment escapes", () => {
       /malformed URL escape/,
     );
   }
+});
+
+test("scans decoded bare query components and query keys", () => {
+  const findings = scanTrackedContent({
+    "fixtures/path-key.txt":
+      "https://example.invalid/docs?%2FUsers%2Fexample%2Fprivate=ok",
+    "fixtures/bare-path.txt":
+      "https://example.invalid/docs?%2Fhome%2Fexample%2Fprivate",
+    "fixtures/bare-file.txt":
+      "https://example.invalid/docs?file%3A%2F%2F%2Froot%2Fprivate",
+  });
+
+  assert.deepEqual(
+    findings.map((item) => item.path).sort(),
+    [
+      "fixtures/bare-file.txt",
+      "fixtures/bare-path.txt",
+      "fixtures/path-key.txt",
+    ],
+  );
+  assert.ok(findings.every((item) => item.rule === "local-path"));
+});
+
+test("ignores hash-router routes but scans explicit fragment data", () => {
+  const findings = scanTrackedContent({
+    "fixtures/raw-home-route.txt": "https://example.invalid/#/home/docs",
+    "fixtures/raw-users-route.txt": "https://example.invalid/#/Users/docs",
+    "fixtures/encoded-root-route.txt":
+      "https://example.invalid/#%2Froot%2Fdocs",
+    "fixtures/fragment-path.txt":
+      "https://example.invalid/#path=/" + "Users/example/private",
+    "fixtures/encoded-fragment-path.txt":
+      "https://example.invalid/#path%3D%2Fhome%2Fexample%2Fprivate",
+    "fixtures/fragment-file.txt":
+      "https://example.invalid/#file:///" + "root/private",
+  });
+
+  assert.deepEqual(
+    findings.map((item) => item.path).sort(),
+    [
+      "fixtures/encoded-fragment-path.txt",
+      "fixtures/fragment-file.txt",
+      "fixtures/fragment-path.txt",
+    ],
+  );
+  assert.ok(findings.every((item) => item.rule === "local-path"));
 });
 
 test("does not scan the documented deny-rule files", () => {
@@ -261,6 +309,46 @@ test("requires a complete context-label token for ambiguous phone forms", () => 
   });
 
   assert.deepEqual(findings, []);
+});
+
+test("uses Unicode word boundaries around labels and plus candidates", () => {
+  const phone = "415-555-0123";
+  const plusPhone = "+" + "1 (415) 555-0123";
+  const findings = scanTrackedContent({
+    "fixtures/latin-label-prefix.txt": `éphone: ${phone}`,
+    "fixtures/latin-label-suffix.txt": `phone: ${phone}é`,
+    "fixtures/kana-label-prefix.txt": `カphone: ${phone}`,
+    "fixtures/kana-label-suffix.txt": `phone: ${phone}カ`,
+    "fixtures/hangul-label-prefix.txt": `가phone: ${phone}`,
+    "fixtures/hangul-label-suffix.txt": `phone: ${phone}가`,
+    "fixtures/astral-label-prefix.txt": `𐐀phone: ${phone}`,
+    "fixtures/astral-label-suffix.txt": `phone: ${phone}𐐀`,
+    "fixtures/latin-plus-prefix.txt": `é${plusPhone}`,
+    "fixtures/latin-plus-suffix.txt": `${plusPhone}é`,
+    "fixtures/kana-plus-prefix.txt": `カ${plusPhone}`,
+    "fixtures/kana-plus-suffix.txt": `${plusPhone}カ`,
+    "fixtures/hangul-plus-prefix.txt": `가${plusPhone}`,
+    "fixtures/hangul-plus-suffix.txt": `${plusPhone}가`,
+    "fixtures/astral-plus-prefix.txt": `𐐀${plusPhone}`,
+    "fixtures/astral-plus-suffix.txt": `${plusPhone}𐐀`,
+  });
+
+  assert.deepEqual(findings, []);
+});
+
+test("enforces eight to fifteen total digits for plus candidates", () => {
+  const findings = scanTrackedContent({
+    "fixtures/minimum.txt": "reach +" + "1 555 0123",
+    "fixtures/maximum.txt": "reach +" + "123 456 789 012 345",
+    "fixtures/too-short.txt": "reach +" + "1 555 012",
+    "fixtures/too-long.txt": "reach +" + "123 456 789 012 345 6",
+  });
+
+  assert.deepEqual(
+    findings.map((item) => item.path).sort(),
+    ["fixtures/maximum.txt", "fixtures/minimum.txt"],
+  );
+  assert.ok(findings.every((item) => item.rule === "real-identity"));
 });
 
 test("never dereferences a tracked symlink outside the repository", () => {
