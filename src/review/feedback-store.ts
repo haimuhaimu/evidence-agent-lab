@@ -59,7 +59,7 @@ function isReviewRecord(value: unknown): value is ReviewRecord {
 }
 
 function primaryEvidenceId(run: AgentRun): string {
-  return run.evidence.find((evidence) => evidence.id === "primary-signal")?.id
+  return run.primaryEvidenceIds[0]
     ?? run.evidence[0]?.id
     ?? "no-primary-evidence";
 }

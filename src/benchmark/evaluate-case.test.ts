@@ -102,8 +102,25 @@ test("rejects orphaned evidence, wrong capability ownership, and non-finite evid
   };
 
   for (const mutation of [orphaned, wrongOwner, nonFinite]) {
-    assert.equal(evaluateCase(definition, mutation).gates.evidenceCoverage, false);
+    assert.equal(
+      evaluateCase(definition, mutation as unknown as AgentRun).gates.evidenceCoverage,
+      false,
+    );
   }
+});
+
+test("rejects orphaned runner relevance even when the evidence trace is otherwise valid", () => {
+  const definition = caseById("feed_drop");
+  const run = runEvidenceAgent(definition.request);
+  const orphanedRelevance = {
+    ...run,
+    primaryEvidenceIds: ["orphan-evidence"],
+  } as unknown as AgentRun;
+
+  assert.equal(
+    evaluateCase(definition, orphanedRelevance).gates.evidenceCoverage,
+    false,
+  );
 });
 
 test("rejects contradictory structured action, training, delivery, and causal claims", () => {

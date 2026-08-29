@@ -9,8 +9,23 @@ export type CapabilityName =
   | "checkDistributionPath"
   | "buildEscalationPacket";
 
+export type EvidenceId =
+  | "entity-snapshot"
+  | "entity-not-found"
+  | "window-coverage"
+  | "data-completeness"
+  | "publish-age"
+  | "policy-flag"
+  | "exposure-vs-history"
+  | "exposure-vs-peer"
+  | "click-rate-vs-peer"
+  | "completion-rate-vs-peer"
+  | "primary-signal"
+  | "feed-share-vs-history"
+  | "escalation-packet";
+
 export type Evidence = {
-  id: string;
+  id: EvidenceId;
   capability: CapabilityName;
   claim: string;
   value: number | string | boolean;
@@ -30,6 +45,7 @@ export type AgentRun = {
   calls: CapabilityCall[];
   decision: Decision;
   evidence: Evidence[];
+  primaryEvidenceIds: EvidenceId[];
   unknowns: string[];
   falsification: string[];
   boundaryNotes: string[];

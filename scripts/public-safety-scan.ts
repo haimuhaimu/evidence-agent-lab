@@ -1,5 +1,6 @@
 import { lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { TextDecoder } from "node:util";
 import path from "node:path";
@@ -16,9 +17,20 @@ export type SafetyFinding = {
     | "unsafe-symlink";
 };
 
-const approvedPngDimensions: ReadonlyMap<string, readonly [number, number]> = new Map([
-  ["public/evidence-agent-lab-desktop.png", [1440, 900]],
-  ["public/evidence-agent-lab-mobile.png", [390, 844]],
+type ApprovedPng = Readonly<{
+  dimensions: readonly [number, number];
+  sha256: string;
+}>;
+
+const approvedPngArtifacts: ReadonlyMap<string, ApprovedPng> = new Map([
+  ["public/evidence-agent-lab-desktop.png", {
+    dimensions: [1440, 900],
+    sha256: "8ac500e20a53cf74144ccc2cf1bc4fdf99e3993a5239b4f74d483cc6ba7f7ebd",
+  }],
+  ["public/evidence-agent-lab-mobile.png", {
+    dimensions: [390, 844],
+    sha256: "0d6739042fec8b22cacf552e4c8c12eb1f8fe67f73c68157a038b8775d5703cb",
+  }],
 ] as const);
 
 const credentialShapes = [
@@ -55,11 +67,7 @@ const realIdentityShapes = [
   /(?:^|[^\p{L}\p{N}\p{M}\p{Pc}])(?:mobile|phone|tel(?:ephone)?|contact|手机|电话|联系电话)\s*[:=：]\s*(?:\(\d{3,4}\)|\d{3})[ .-]\d{3,4}[ .-]\d{4}(?![\p{L}\p{N}\p{M}\p{Pc}])/iu,
 ];
 
-const classificationSampleBytes = 64 * 1024;
 const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-const localPathOccurrenceAllowances: ReadonlyMap<string, readonly string[]> = new Map([
-  ["scripts/public-safety-scan.test.ts", ["%2F", "%25ZZ", "%ZZ", "%E0%A4%A"]],
-] as const);
 
 function crc32(data: Buffer): number {
   let crc = 0xffffffff;
@@ -74,9 +82,12 @@ function crc32(data: Buffer): number {
 
 function isValidApprovedPng(
   data: Buffer,
-  expectedDimensions: readonly [number, number],
+  approved: ApprovedPng,
 ): boolean {
   if (data.length < pngSignature.length + 12 || !data.subarray(0, 8).equals(pngSignature)) {
+    return false;
+  }
+  if (createHash("sha256").update(data).digest("hex") !== approved.sha256) {
     return false;
   }
 
@@ -111,18 +122,22 @@ function isValidApprovedPng(
       if (type !== "IHDR" || length !== 13) {
         return false;
       }
-      const [expectedWidth, expectedHeight] = expectedDimensions;
+      const [expectedWidth, expectedHeight] = approved.dimensions;
       const width = chunkData.readUInt32BE(0);
       const height = chunkData.readUInt32BE(4);
+      const bitDepth = chunkData[8];
+      const colorType = chunkData[9];
       const compression = chunkData[10];
       const filtering = chunkData[11];
       const interlace = chunkData[12];
       if (
         width !== expectedWidth
         || height !== expectedHeight
+        || bitDepth !== 8
+        || colorType !== 2
         || compression !== 0
         || filtering !== 0
-        || ![0, 1].includes(interlace)
+        || interlace !== 0
       ) {
         return false;
       }
@@ -232,37 +247,16 @@ function localPathScanContent(content: string): string {
   return [contentWithoutWebRoutes, ...decodedValues].join("\n");
 }
 
-function applyLocalPathOccurrenceAllowances(
-  trackedPath: string,
-  content: string,
-): string {
-  const allowedOccurrences = localPathOccurrenceAllowances.get(trackedPath);
-  if (!allowedOccurrences) {
-    return content;
-  }
-
-  return allowedOccurrences.reduce(
-    (result, occurrence) => result.replaceAll(
-      occurrence,
-      occurrence.replaceAll("%", "%2525"),
-    ),
-    content,
-  );
-}
-
 function isBinaryContent(data: Buffer): boolean {
-  const sample = data.subarray(0, classificationSampleBytes);
-  if (sample.length === 0) {
+  if (data.length === 0) {
     return false;
   }
-  if (sample.includes(0)) {
+  if (data.includes(0)) {
     return true;
   }
 
   try {
-    new TextDecoder("utf-8", { fatal: true }).decode(sample, {
-      stream: data.length > sample.length,
-    });
+    new TextDecoder("utf-8", { fatal: true }).decode(data);
   } catch (error) {
     if (error instanceof TypeError) {
       return true;
@@ -271,13 +265,13 @@ function isBinaryContent(data: Buffer): boolean {
   }
 
   let controlBytes = 0;
-  for (const byte of sample) {
+  for (const byte of data) {
     if ((byte < 32 && byte !== 9 && byte !== 10 && byte !== 13) || byte === 127) {
       controlBytes += 1;
     }
   }
 
-  return controlBytes / sample.length > 0.1;
+  return controlBytes / data.length > 0.1;
 }
 
 export function scanTrackedContent(
@@ -292,9 +286,7 @@ export function scanTrackedContent(
     if (credentialShapes.some((shape) => shape.test(content))) {
       rules.add("credential-shape");
     }
-    const contentForLocalPathScan = localPathScanContent(
-      applyLocalPathOccurrenceAllowances(path, content),
-    );
+    const contentForLocalPathScan = localPathScanContent(content);
     if (localPathShapes.some((shape) => shape.test(contentForLocalPathScan))) {
       rules.add("local-path");
     }
@@ -348,13 +340,13 @@ function loadTrackedContent(): {
 
     const data = readFileSync(trackedPath);
     if (isBinaryContent(data)) {
-      const expectedDimensions = approvedPngDimensions.get(trackedPath);
-      if (expectedDimensions && isValidApprovedPng(data, expectedDimensions)) {
+      const approvedPng = approvedPngArtifacts.get(trackedPath);
+      if (approvedPng && isValidApprovedPng(data, approvedPng)) {
         continue;
       }
       findings.push({
         path: trackedPath,
-        rule: expectedDimensions ? "invalid-binary" : "unapproved-binary",
+        rule: approvedPng ? "invalid-binary" : "unapproved-binary",
       });
       continue;
     }

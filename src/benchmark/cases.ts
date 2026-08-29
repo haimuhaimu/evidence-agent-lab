@@ -1,6 +1,7 @@
 import type {
   CapabilityName,
   Decision,
+  EvidenceId,
   RunBoundary,
 } from "../core/types";
 import type {
@@ -138,7 +139,30 @@ type DefinedCase = {
   calls?: ExpectedCall[];
   evidence?: ExpectedEvidence[];
   clarificationNeeded?: string[];
+  primaryEvidenceIds?: EvidenceId[];
 };
+
+function defaultPrimaryEvidenceIds(entityId: string): EvidenceId[] {
+  if (entityId === "content_click_drop") {
+    return ["primary-signal", "exposure-vs-history", "click-rate-vs-peer"];
+  }
+  if (entityId === "content_retention_drop") {
+    return ["primary-signal", "exposure-vs-history", "completion-rate-vs-peer"];
+  }
+  if (entityId === "content_feed_drop") {
+    return ["feed-share-vs-history", "exposure-vs-history", "exposure-vs-peer"];
+  }
+  if (entityId === "content_incomplete") {
+    return ["data-completeness"];
+  }
+  if (entityId === "content_missing") {
+    return ["entity-not-found"];
+  }
+  if (entityId.length === 0) {
+    return [];
+  }
+  return ["exposure-vs-history", "click-rate-vs-peer", "completion-rate-vs-peer"];
+}
 
 function defineCase(input: DefinedCase): BenchmarkCase {
   const calls = input.calls ?? BASE_CALLS;
@@ -155,6 +179,9 @@ function defineCase(input: DefinedCase): BenchmarkCase {
     },
     expectedCalls: calls.map((call) => ({ ...call })),
     expectedEvidence: evidence.map((item) => ({ ...item })),
+    expectedPrimaryEvidenceIds: [
+      ...(input.primaryEvidenceIds ?? defaultPrimaryEvidenceIds(input.entityId)),
+    ],
     expectedDecision: input.expectedDecision,
     expectedBoundary: {
       ...DEFAULT_BOUNDARY,

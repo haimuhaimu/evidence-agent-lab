@@ -223,3 +223,53 @@ test("includes the exact boundary notes on every exit path", () => {
     });
   }
 });
+
+test("records at most three call-owned primary evidence ids on every exit path", () => {
+  const cases = [
+    {
+      request: { entityId: "content_steady", query: "近 7 天正常吗" },
+      expected: ["exposure-vs-history", "click-rate-vs-peer", "completion-rate-vs-peer"],
+    },
+    {
+      request: { entityId: "content_click_drop", query: "近 7 天为什么掉了" },
+      expected: ["primary-signal", "exposure-vs-history", "click-rate-vs-peer"],
+    },
+    {
+      request: { entityId: "content_retention_drop", query: "近 7 天为什么掉了" },
+      expected: ["primary-signal", "exposure-vs-history", "completion-rate-vs-peer"],
+    },
+    {
+      request: { entityId: "content_feed_drop", query: "近 7 天为什么掉了" },
+      expected: ["feed-share-vs-history", "exposure-vs-history", "exposure-vs-peer"],
+    },
+    {
+      request: { entityId: "content_incomplete", query: "近 7 天正常吗" },
+      expected: ["data-completeness"],
+    },
+    {
+      request: { entityId: "content_missing", query: "近 7 天正常吗" },
+      expected: ["entity-not-found"],
+    },
+    {
+      request: { entityId: "content_steady", query: "近 42 天正常吗" },
+      expected: ["window-coverage"],
+    },
+    {
+      request: { entityId: "", query: "近 7 天正常吗" },
+      expected: [],
+    },
+  ] as const;
+
+  for (const { request, expected } of cases) {
+    const run = runEvidenceAgent(request);
+    const { primaryEvidenceIds } = run;
+    const callOwnedIds = new Set(
+      run.calls.flatMap((call) => call.evidence.map((item) => item.id)),
+    );
+
+    assert.deepEqual(primaryEvidenceIds, expected, request.entityId || "missing entity");
+    assert.ok(primaryEvidenceIds.length <= 3);
+    assert.equal(new Set(primaryEvidenceIds).size, primaryEvidenceIds.length);
+    assert.ok(primaryEvidenceIds.every((id) => callOwnedIds.has(id)));
+  }
+});

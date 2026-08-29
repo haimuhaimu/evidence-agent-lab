@@ -1,5 +1,14 @@
-import type { CapabilityCall, Evidence, SyntheticEntitySnapshot } from "../core/types";
+import type {
+  CapabilityCall,
+  Evidence,
+  EvidenceId,
+  SyntheticEntitySnapshot,
+} from "../core/types";
 import type { Capability } from "./types";
+
+export type SafetyGateCall = CapabilityCall & {
+  primaryEvidenceIds: EvidenceId[];
+};
 
 function safetyEvidence(
   id: "window-coverage" | "data-completeness" | "publish-age" | "policy-flag",
@@ -17,7 +26,7 @@ function safetyEvidence(
   };
 }
 
-export const checkSafetyGateCapability: Capability<SyntheticEntitySnapshot, CapabilityCall> = {
+export const checkSafetyGateCapability: Capability<SyntheticEntitySnapshot, SafetyGateCall> = {
   name: "checkSafetyGate",
   run(snapshot) {
     const hasExactWindow = snapshot.metrics?.days === snapshot.requestedDays;
@@ -31,6 +40,7 @@ export const checkSafetyGateCapability: Capability<SyntheticEntitySnapshot, Capa
           false,
           "high",
         )],
+        primaryEvidenceIds: ["window-coverage"],
         reason: `The exact ${snapshot.requestedDays}-day synthetic metric window is unavailable.`,
       };
     }
@@ -38,19 +48,23 @@ export const checkSafetyGateCapability: Capability<SyntheticEntitySnapshot, Capa
     const metrics = snapshot.metrics!;
     const ageCoversWindow = snapshot.publishedHours >= snapshot.requestedDays * 24;
     const reasons: string[] = [];
+    const primaryEvidenceIds: EvidenceId[] = [];
 
     if (!ageCoversWindow) {
       reasons.push(
         `Publication age does not cover the requested ${snapshot.requestedDays}-day window.`,
       );
+      primaryEvidenceIds.push("window-coverage");
     }
 
     if (metrics.dataCompleteness < 0.75) {
       reasons.push("Data completeness is below the public demo threshold.");
+      primaryEvidenceIds.push("data-completeness");
     }
 
     if (snapshot.policyFlag) {
       reasons.push("A synthetic policy flag requires the diagnosis to stop.");
+      primaryEvidenceIds.push("policy-flag");
     }
 
     const evidence = [
@@ -92,6 +106,7 @@ export const checkSafetyGateCapability: Capability<SyntheticEntitySnapshot, Capa
       name: "checkSafetyGate",
       status: reasons.length > 0 ? "blocked" : "completed",
       evidence,
+      primaryEvidenceIds,
       reason: reasons.length > 0
         ? reasons.join(" ")
         : "The requested synthetic window passed the public safety gate.",
@@ -99,6 +114,6 @@ export const checkSafetyGateCapability: Capability<SyntheticEntitySnapshot, Capa
   },
 };
 
-export function checkSafetyGate(snapshot: SyntheticEntitySnapshot): CapabilityCall {
+export function checkSafetyGate(snapshot: SyntheticEntitySnapshot): SafetyGateCall {
   return checkSafetyGateCapability.run(snapshot);
 }

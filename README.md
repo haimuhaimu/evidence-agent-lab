@@ -62,6 +62,8 @@ flowchart LR
 
 The runner owns execution and early stops; capabilities emit typed evidence; the decision builder reads the accumulated context; and the browser UI renders the resulting `AgentRun`. More detail is in [the architecture notes](docs/architecture.md).
 
+The two checked-in release screenshots are exact reviewed artifacts: the public-safety gate locks their paths, dimensions, PNG format, and SHA-256 digests. An intentional recapture must be visually reviewed and have its digest allowlist updated in the same change; see [the contribution guide](CONTRIBUTING.md).
+
 ## Boundaries
 
 - Deterministic planner; there is no free-form model planner.

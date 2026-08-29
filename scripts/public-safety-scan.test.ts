@@ -17,6 +17,11 @@ import { scanTrackedContent } from "./public-safety-scan";
 
 const scannerPath = fileURLToPath(new URL("./public-safety-scan.ts", import.meta.url));
 const tsxImport = import.meta.resolve("tsx");
+const percent = "%";
+const encodedSlash = `${percent}2F`;
+const malformedEscape = `${percent}ZZ`;
+const malformedUtf8 = `${percent}E0${percent}A4${percent}A`;
+const encodedMalformedEscape = `${percent}25ZZ`;
 
 function runGit(cwd: string, args: string[]): void {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -153,13 +158,13 @@ test("scans decoded URL query and fragment values but not route segments", () =>
     "fixtures/raw-query.txt":
       "https://example.invalid/docs?file=/" + "Users/example/private",
     "fixtures/encoded-query.txt":
-      "https://example.invalid/docs?path=%2Fhome%2Fexample%2Fprivate",
+      `https://example.invalid/docs?path=${encodedSlash}home${encodedSlash}example${encodedSlash}private`,
     "fixtures/nested-file-query.txt":
-      "https://example.invalid/docs?next=file%3A%2F%2F%2FUsers%2Fexample%2Fprivate",
+      `https://example.invalid/docs?next=file%3A${encodedSlash}${encodedSlash}${encodedSlash}Users${encodedSlash}example${encodedSlash}private`,
     "fixtures/raw-fragment.txt":
       "https://example.invalid/docs#file:///" + "home/example/private",
     "fixtures/encoded-fragment.txt":
-      "https://example.invalid/docs#path=file%3A%2F%2F%2Froot%2Fprivate",
+      `https://example.invalid/docs#path=file%3A${encodedSlash}${encodedSlash}${encodedSlash}root${encodedSlash}private`,
   });
 
   assert.deepEqual(
@@ -177,10 +182,10 @@ test("scans decoded URL query and fragment values but not route segments", () =>
 
 test("fails closed on malformed URL parameter or fragment escapes", () => {
   const malformedContents = [
-    "https://example.invalid/docs?file=%E0%A4%A",
-    "https://example.invalid/docs?%ZZ=value",
-    "https://example.invalid/docs?%E0%A4%A",
-    "https://example.invalid/docs#path=%ZZ%2FUsers%2Fexample",
+    `https://example.invalid/docs?file=${malformedUtf8}`,
+    `https://example.invalid/docs?${malformedEscape}=value`,
+    `https://example.invalid/docs?${malformedUtf8}`,
+    `https://example.invalid/docs#path=${malformedEscape}${encodedSlash}Users${encodedSlash}example`,
   ];
 
   for (const content of malformedContents) {
@@ -194,11 +199,11 @@ test("fails closed on malformed URL parameter or fragment escapes", () => {
 test("scans decoded bare query components and query keys", () => {
   const findings = scanTrackedContent({
     "fixtures/path-key.txt":
-      "https://example.invalid/docs?%2FUsers%2Fexample%2Fprivate=ok",
+      `https://example.invalid/docs?${encodedSlash}Users${encodedSlash}example${encodedSlash}private=ok`,
     "fixtures/bare-path.txt":
-      "https://example.invalid/docs?%2Fhome%2Fexample%2Fprivate",
+      `https://example.invalid/docs?${encodedSlash}home${encodedSlash}example${encodedSlash}private`,
     "fixtures/bare-file.txt":
-      "https://example.invalid/docs?file%3A%2F%2F%2Froot%2Fprivate",
+      `https://example.invalid/docs?file%3A${encodedSlash}${encodedSlash}${encodedSlash}root${encodedSlash}private`,
   });
 
   assert.deepEqual(
@@ -217,11 +222,11 @@ test("ignores hash-router routes but scans explicit fragment data", () => {
     "fixtures/raw-home-route.txt": "https://example.invalid/#/home/docs",
     "fixtures/raw-users-route.txt": "https://example.invalid/#/Users/docs",
     "fixtures/encoded-root-route.txt":
-      "https://example.invalid/#%2Froot%2Fdocs",
+      `https://example.invalid/#${encodedSlash}root${encodedSlash}docs`,
     "fixtures/fragment-path.txt":
       "https://example.invalid/#path=/" + "Users/example/private",
     "fixtures/encoded-fragment-path.txt":
-      "https://example.invalid/#path%3D%2Fhome%2Fexample%2Fprivate",
+      `https://example.invalid/#path%3D${encodedSlash}home${encodedSlash}example${encodedSlash}private`,
     "fixtures/fragment-file.txt":
       "https://example.invalid/#file:///" + "root/private",
   });
@@ -242,15 +247,15 @@ test("scans complete hash-route queries but ignores route pathnames", () => {
     "fixtures/raw-route-query-path.txt":
       "https://example.invalid/#/docs?path=/" + "Users/example/private",
     "fixtures/encoded-route-query-path.txt":
-      "https://example.invalid/#%2Fdocs%3Fpath%3D%2FUsers%2Fexample%2Fprivate",
+      `https://example.invalid/#${encodedSlash}docs%3Fpath%3D${encodedSlash}Users${encodedSlash}example${encodedSlash}private`,
     "fixtures/raw-route-query-file.txt":
       "https://example.invalid/#/docs?next=file:///" + "home/example/private",
     "fixtures/encoded-route-query-file.txt":
-      "https://example.invalid/#%2Fdocs%3Fnext%3Dfile%3A%2F%2F%2Fhome%2Fexample%2Fprivate",
+      `https://example.invalid/#${encodedSlash}docs%3Fnext%3Dfile%3A${encodedSlash}${encodedSlash}${encodedSlash}home${encodedSlash}example${encodedSlash}private`,
     "fixtures/raw-route-only.txt":
       "https://example.invalid/#/Users/example/private",
     "fixtures/encoded-route-only.txt":
-      "https://example.invalid/#%2Fhome%2Fexample%2Fprivate",
+      `https://example.invalid/#${encodedSlash}home${encodedSlash}example${encodedSlash}private`,
   });
 
   assert.deepEqual(
@@ -267,10 +272,10 @@ test("scans complete hash-route queries but ignores route pathnames", () => {
 
 test("fails closed generically on malformed hash-route query escapes", () => {
   const malformedContents = [
-    "https://example.invalid/#/docs?path=%ZZ",
-    "https://example.invalid/#%2Fdocs%3Fpath%3D%25ZZ",
-    "https://example.invalid/#%2Fdocs%3F%25ZZ%3Dsafe",
-    "https://example.invalid/#%2Fdocs%3F%25ZZ",
+    `https://example.invalid/#/docs?path=${malformedEscape}`,
+    `https://example.invalid/#${encodedSlash}docs%3Fpath%3D${encodedMalformedEscape}`,
+    `https://example.invalid/#${encodedSlash}docs%3F${encodedMalformedEscape}%3Dsafe`,
+    `https://example.invalid/#${encodedSlash}docs%3F${encodedMalformedEscape}`,
   ];
 
   for (const content of malformedContents) {
@@ -299,12 +304,42 @@ test("does not grant whole-file exemptions to scanner or privacy paths", () => {
   ]);
 });
 
-test("limits the scanner-test allowance to malformed URL occurrences", () => {
+test("does not grant malformed URL allowances to scanner test source", () => {
+  assert.throws(
+    () => scanTrackedContent({
+      "scripts/public-safety-scan.test.ts":
+        `https://example.invalid/docs?path=${malformedEscape}`,
+    }),
+    /malformed URL escape/,
+  );
+});
+
+test("detects encoded home paths anywhere in the scanner test source", () => {
+  const encodedPaths = [
+    `${encodedSlash}Users${encodedSlash}example${encodedSlash}private`,
+    `${encodedSlash}home${encodedSlash}example${encodedSlash}private`,
+    `${encodedSlash}root${encodedSlash}private`,
+  ];
+
+  for (const [index, encodedPath] of encodedPaths.entries()) {
+    const separator = index === 1 ? "#path=" : "?path=";
+    const findings = scanTrackedContent({
+      "scripts/public-safety-scan.test.ts":
+        `https://example.invalid/docs${separator}${encodedPath}`,
+    });
+
+    assert.deepEqual(findings, [
+      { path: "scripts/public-safety-scan.test.ts", rule: "local-path" },
+    ]);
+  }
+});
+
+test("does not let one scanner-test occurrence mask a second encoded home path", () => {
   const findings = scanTrackedContent({
-    "scripts/public-safety-scan.test.ts":
-      "https://example.invalid/docs?path=%ZZ "
-      + "https://example.invalid/#%2Fdocs%3Fpath%3D%25ZZ and /"
-      + "Users/example/private",
+    "scripts/public-safety-scan.test.ts": [
+      `https://example.invalid/docs?first=${encodedSlash}Users${encodedSlash}example${encodedSlash}one`,
+      `https://example.invalid/docs#second=${encodedSlash}home${encodedSlash}example${encodedSlash}two`,
+    ].join(" "),
   });
 
   assert.deepEqual(findings, [
@@ -504,6 +539,33 @@ test("rejects an unapproved binary instead of silently skipping it", () => {
   }
 });
 
+test("classifies binary content after the first 65536 bytes", () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "safety-binary-suffix-"));
+  const asciiPrefix = Buffer.alloc(65_536, 65);
+  const candidates = {
+    "late-nul.bin": Buffer.concat([asciiPrefix, Buffer.from([0])]),
+    "late-invalid-utf8.bin": Buffer.concat([asciiPrefix, Buffer.from([0xc3, 0x28])]),
+    "late-opaque.bin": Buffer.concat([asciiPrefix, Buffer.alloc(8_192, 1)]),
+  };
+
+  try {
+    for (const [name, contents] of Object.entries(candidates)) {
+      writeFileSync(join(fixtureRoot, name), contents);
+    }
+    runGit(fixtureRoot, ["init", "-q"]);
+    runGit(fixtureRoot, ["add", "."]);
+
+    const result = runSafetyCli(fixtureRoot);
+
+    assert.equal(result.status, 1);
+    for (const name of Object.keys(candidates)) {
+      assert.match(result.stderr, new RegExp(`${name}\\tunapproved-binary`));
+    }
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
 function crc32(data: Buffer): number {
   let crc = 0xffffffff;
   for (const byte of data) {
@@ -522,6 +584,42 @@ function pngChunk(type: string, data: Buffer): Buffer {
   length.writeUInt32BE(data.length);
   checksum.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])));
   return Buffer.concat([length, typeBytes, data, checksum]);
+}
+
+function rewritePng(
+  original: Buffer,
+  transform: (type: string, data: Buffer) => Buffer | null,
+): Buffer {
+  const chunks: Buffer[] = [original.subarray(0, 8)];
+  let offset = 8;
+
+  while (offset < original.length) {
+    const length = original.readUInt32BE(offset);
+    const type = original.subarray(offset + 4, offset + 8).toString("ascii");
+    const data = original.subarray(offset + 8, offset + 8 + length);
+    const replacement = transform(type, Buffer.from(data));
+    if (replacement) {
+      chunks.push(pngChunk(type, replacement));
+    }
+    offset += length + 12;
+  }
+
+  return Buffer.concat(chunks);
+}
+
+function runDesktopPngCandidate(candidate: Buffer) {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "safety-png-candidate-"));
+  const publicDir = join(fixtureRoot, "public");
+  mkdirSync(publicDir);
+
+  try {
+    writeFileSync(join(publicDir, "evidence-agent-lab-desktop.png"), candidate);
+    runGit(fixtureRoot, ["init", "-q"]);
+    runGit(fixtureRoot, ["add", "public/evidence-agent-lab-desktop.png"]);
+    return runSafetyCli(fixtureRoot);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
 }
 
 test("allows only the two structurally valid release PNG dimensions", () => {
@@ -545,6 +643,69 @@ test("allows only the two structurally valid release PNG dimensions", () => {
     assert.match(result.stdout, /0 public-safety findings/);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test("rejects CRC-valid changes to release PNG image data", () => {
+  const original = readFileSync(new URL("../public/evidence-agent-lab-desktop.png", import.meta.url));
+  let changed = false;
+  const candidate = rewritePng(original, (type, data) => {
+    if (type === "IDAT" && !changed && data.length > 0) {
+      data[0] ^= 1;
+      changed = true;
+    }
+    return data;
+  });
+  assert.equal(changed, true);
+
+  const result = runDesktopPngCandidate(candidate);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /public\/evidence-agent-lab-desktop\.png\tinvalid-binary/);
+});
+
+test("rejects non-reviewed PNG bit depth color type and interlace", () => {
+  const original = readFileSync(new URL("../public/evidence-agent-lab-desktop.png", import.meta.url));
+  const mutations = [
+    { index: 8, value: 16 },
+    { index: 9, value: 6 },
+    { index: 12, value: 1 },
+  ];
+
+  for (const mutation of mutations) {
+    const candidate = rewritePng(original, (type, data) => {
+      if (type === "IHDR") {
+        data[mutation.index] = mutation.value;
+      }
+      return data;
+    });
+    const result = runDesktopPngCandidate(candidate);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /public\/evidence-agent-lab-desktop\.png\tinvalid-binary/);
+  }
+});
+
+test("rejects empty and corrupt CRC-valid release PNG image data", () => {
+  const original = readFileSync(new URL("../public/evidence-agent-lab-desktop.png", import.meta.url));
+  const replacements = [Buffer.alloc(0), Buffer.from([0x78, 0x9c, 0, 0, 0, 0])];
+
+  for (const replacement of replacements) {
+    let wroteReplacement = false;
+    const candidate = rewritePng(original, (type, data) => {
+      if (type !== "IDAT") {
+        return data;
+      }
+      if (wroteReplacement) {
+        return null;
+      }
+      wroteReplacement = true;
+      return replacement;
+    });
+    const result = runDesktopPngCandidate(candidate);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /public\/evidence-agent-lab-desktop\.png\tinvalid-binary/);
   }
 });
 

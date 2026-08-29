@@ -40,6 +40,7 @@ test("ships exactly the eighteen fixed request and decision contracts", () => {
 
 test("every case locks clarification, exact call status, evidence ownership, and boundary", () => {
   for (const item of BENCHMARK_CASES) {
+    const { expectedPrimaryEvidenceIds } = item;
     assert.equal(item.expectedRequest.query, item.request.query, item.id);
     assert.ok(Array.isArray(item.expectedRequest.clarificationNeeded), item.id);
     assert.ok(Array.isArray(item.expectedCalls), item.id);
@@ -52,6 +53,19 @@ test("every case locks clarification, exact call status, evidence ownership, and
     assert.equal(
       new Set(item.expectedEvidence.map((evidence) => evidence.id)).size,
       item.expectedEvidence.length,
+      item.id,
+    );
+    assert.ok(Array.isArray(expectedPrimaryEvidenceIds), item.id);
+    assert.ok(expectedPrimaryEvidenceIds.length <= 3, item.id);
+    assert.equal(
+      new Set(expectedPrimaryEvidenceIds).size,
+      expectedPrimaryEvidenceIds.length,
+      item.id,
+    );
+    assert.ok(
+      expectedPrimaryEvidenceIds.every((id) => (
+        item.expectedEvidence.some((evidence) => evidence.id === id)
+      )),
       item.id,
     );
     assert.deepEqual(item.expectedBoundary, {
@@ -68,6 +82,10 @@ test("locks honest early-stop contracts without invented downstream evidence", (
 
   assert.deepEqual(byId.get("missing_object")?.expectedCalls, []);
   assert.deepEqual(byId.get("missing_object")?.expectedEvidence, []);
+  assert.deepEqual(
+    byId.get("missing_object")?.expectedPrimaryEvidenceIds,
+    [],
+  );
   assert.deepEqual(byId.get("missing_object")?.expectedRequest.clarificationNeeded, [
     "Choose a synthetic content object.",
   ]);
@@ -88,5 +106,9 @@ test("locks honest early-stop contracts without invented downstream evidence", (
   assert.equal(
     byId.get("incomplete_data")?.expectedEvidence.find((item) => item.id === "data-completeness")?.value,
     0.5,
+  );
+  assert.deepEqual(
+    byId.get("incomplete_data")?.expectedPrimaryEvidenceIds,
+    ["data-completeness"],
   );
 });

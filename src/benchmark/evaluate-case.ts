@@ -38,7 +38,9 @@ function evidenceSupportsDecision(
   definition: BenchmarkCase,
   run: AgentRun,
 ): boolean {
-  const values = new Map(run.evidence.map((item) => [item.id, item.value]));
+  const values = new Map<string, Evidence["value"]>(
+    run.evidence.map((item) => [item.id, item.value]),
+  );
   const numberValue = (id: string): number | undefined => {
     const value = values.get(id);
     return typeof value === "number" && Number.isFinite(value) ? value : undefined;
@@ -99,11 +101,20 @@ function validateEvidence(definition: BenchmarkCase, run: AgentRun): boolean {
     && flattened.every((item, index) => (
       evidenceValueMatches(item, definition.expectedEvidence[index])
     ));
+  const primaryEvidenceIdsAreTraceOwned = run.primaryEvidenceIds.length <= 3
+    && new Set(run.primaryEvidenceIds).size === run.primaryEvidenceIds.length
+    && run.primaryEvidenceIds.every((id) => uniqueIds.has(id));
+  const exactExpectedPrimaryEvidence = sameJson(
+    run.primaryEvidenceIds,
+    definition.expectedPrimaryEvidenceIds,
+  );
 
   return uniqueIds.size === flattened.length
     && traceOwnsEvidence
     && traceMirrorsRun
     && exactExpectedEvidence
+    && primaryEvidenceIdsAreTraceOwned
+    && exactExpectedPrimaryEvidence
     && evidenceSupportsDecision(definition, run);
 }
 

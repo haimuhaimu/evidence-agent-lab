@@ -4,6 +4,7 @@ import type {
   AgentRun,
   CapabilityCall,
   Decision,
+  EvidenceId,
   ParsedRequest,
 } from "../core/types";
 import { buildDecision, type DecisionContext } from "./build-decision";
@@ -23,12 +24,25 @@ function finishRun(
   decision: Decision,
   unknowns: string[],
   falsification: string[],
+  primaryEvidenceIds: EvidenceId[],
 ): AgentRun {
+  const callOwnedEvidenceIds = new Set(
+    calls.flatMap((call) => call.evidence.map((item) => item.id)),
+  );
+  if (
+    primaryEvidenceIds.length > 3
+    || new Set(primaryEvidenceIds).size !== primaryEvidenceIds.length
+    || primaryEvidenceIds.some((id) => !callOwnedEvidenceIds.has(id))
+  ) {
+    throw new Error("Primary evidence must be unique, call-owned, and limited to three items.");
+  }
+
   return {
     request,
     calls,
     decision,
     evidence: calls.flatMap((call) => call.evidence),
+    primaryEvidenceIds: [...primaryEvidenceIds],
     unknowns: [...unknowns],
     falsification,
     boundaryNotes: [...BOUNDARY_NOTES],
@@ -74,6 +88,7 @@ function finishFromContext(
   request: ParsedRequest,
   calls: CapabilityCall[],
   context: DecisionContext,
+  primaryEvidenceIds: EvidenceId[] = [],
 ): AgentRun {
   const decision = buildDecision(context);
 
@@ -83,6 +98,7 @@ function finishFromContext(
     decision,
     context.unknowns,
     buildFalsification(decision, context),
+    primaryEvidenceIds,
   );
 }
 
@@ -113,7 +129,7 @@ export function runEvidenceAgent(request: AgentRequest): AgentRun {
   if (!loaded.snapshot) {
     context.blocked = true;
     context.unknowns.push(loaded.call.reason);
-    return finishFromContext(parsed, calls, context);
+    return finishFromContext(parsed, calls, context, ["entity-not-found"]);
   }
 
   context.policyFlag = loaded.snapshot.policyFlag;
@@ -124,7 +140,7 @@ export function runEvidenceAgent(request: AgentRequest): AgentRun {
     if (!loaded.snapshot.policyFlag) {
       context.unknowns.push(safety.reason);
     }
-    return finishFromContext(parsed, calls, context);
+    return finishFromContext(parsed, calls, context, safety.primaryEvidenceIds);
   }
 
   const historical = CAPABILITY_REGISTRY.compareHistoricalBaseline(loaded.snapshot);
@@ -133,7 +149,12 @@ export function runEvidenceAgent(request: AgentRequest): AgentRun {
   if (historical.call.status === "blocked") {
     context.blocked = true;
     context.unknowns.push(historical.call.reason);
-    return finishFromContext(parsed, calls, context);
+    return finishFromContext(
+      parsed,
+      calls,
+      context,
+      historical.call.evidence.map((item) => item.id),
+    );
   }
 
   const peer = CAPABILITY_REGISTRY.comparePeerBenchmark(loaded.snapshot);
@@ -143,7 +164,12 @@ export function runEvidenceAgent(request: AgentRequest): AgentRun {
   if (peer.call.status === "blocked") {
     context.blocked = true;
     context.unknowns.push(peer.call.reason);
-    return finishFromContext(parsed, calls, context);
+    return finishFromContext(
+      parsed,
+      calls,
+      context,
+      peer.call.evidence.filter((item) => item.confidence === "low").map((item) => item.id),
+    );
   }
 
   const attribution = CAPABILITY_REGISTRY.attributeSignalDrop({ historical, peer });
@@ -151,7 +177,12 @@ export function runEvidenceAgent(request: AgentRequest): AgentRun {
   if (attribution.call.status === "blocked") {
     context.blocked = true;
     context.unknowns.push(attribution.call.reason);
-    return finishFromContext(parsed, calls, context);
+    return finishFromContext(
+      parsed,
+      calls,
+      context,
+      attribution.call.evidence.map((item) => item.id),
+    );
   }
 
   context.attributedRisk = attribution.explainsExposureDrop;
@@ -165,7 +196,12 @@ export function runEvidenceAgent(request: AgentRequest): AgentRun {
     if (distribution.call.status === "blocked") {
       context.blocked = true;
       context.unknowns.push(distribution.call.reason);
-      return finishFromContext(parsed, calls, context);
+      return finishFromContext(
+        parsed,
+        calls,
+        context,
+        distribution.call.evidence.map((item) => item.id),
+      );
     }
 
     context.distributionRisk = distribution.status === "risk";
@@ -181,11 +217,20 @@ export function runEvidenceAgent(request: AgentRequest): AgentRun {
     calls.push(packet.call);
   }
 
+  const primaryEvidenceIds: EvidenceId[] = context.distributionRisk
+    ? ["feed-share-vs-history", "exposure-vs-history", "exposure-vs-peer"]
+    : attribution.primarySignal === "click_rate"
+      ? ["primary-signal", "exposure-vs-history", "click-rate-vs-peer"]
+      : attribution.primarySignal === "completion_rate"
+        ? ["primary-signal", "exposure-vs-history", "completion-rate-vs-peer"]
+        : ["exposure-vs-history", "click-rate-vs-peer", "completion-rate-vs-peer"];
+
   return finishRun(
     parsed,
     calls,
     decision,
     context.unknowns,
     buildFalsification(decision, context),
+    primaryEvidenceIds,
   );
 }

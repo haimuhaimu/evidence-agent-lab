@@ -15,6 +15,8 @@ Evidence Agent Lab is intentionally narrow: a deterministic, auditable loop over
 
 5. Explain any benchmark snapshot change. Do not refresh the snapshot merely to hide a failing gate.
 
+If a UI change intentionally recaptures either release screenshot, keep the exact 1440×900 desktop and 390×844 mobile paths, inspect both images for public-data and boundary leaks, then update the matching SHA-256 entries in `scripts/public-safety-scan.ts` in the same reviewed change. The scanner deliberately fails closed when a screenshot's bytes, dimensions, or PNG format differ; never update a digest merely to silence that failure.
+
 ## Pull request checklist
 
 - Link the issue and list the synthetic case IDs exercised.
@@ -22,5 +24,6 @@ Evidence Agent Lab is intentionally narrow: a deterministic, auditable loop over
 - Confirm that the change introduces no private data or credentials.
 - Disclose whether an LLM helped write code, tests, documentation, or case text, and describe the human review performed.
 - State whether `benchmark/latest.json` changed and why.
+- State whether either release screenshot or its reviewed SHA-256 changed and why.
 
 No contribution may claim production action, model training, causal uplift, external notification, or real-world calibration.

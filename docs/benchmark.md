@@ -33,7 +33,7 @@ The query text is synthetic. Each Chinese query has an English explanation below
 | --- | --- |
 | Request understanding | Parsed entity, query, goal, time window, and clarification state exactly equal the case contract. |
 | Capability path | Capability names and statuses exactly match the declared order, with no duplicates or extra calls. |
-| Evidence coverage | Evidence is mirrored from the matching capability call, synthetic, unique, finite where numeric, equal to expected values, and relevant to the decision. |
+| Evidence coverage | Evidence is mirrored from the matching capability call, synthetic, unique, finite where numeric, equal to expected values, and relevant to the decision. Runner-owned primary evidence IDs must exactly match the case, remain unique, contain at most three items, and belong to recorded calls. |
 | Decision correctness | The typed decision equals the case's declared expectation. |
 | Honesty boundary | Structured scope, planner, action, training, delivery, and causal fields match the no-production contract; escalation delivery remains `not_sent`. |
 

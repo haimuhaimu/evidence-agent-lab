@@ -3,6 +3,7 @@ import type {
   CapabilityCall,
   Decision,
   Evidence,
+  EvidenceId,
   ParsedRequest,
   RunBoundary,
 } from "../core/types";
@@ -16,6 +17,7 @@ export type BenchmarkCase = {
   expectedRequest: ParsedRequest;
   expectedCalls: ExpectedCall[];
   expectedEvidence: ExpectedEvidence[];
+  expectedPrimaryEvidenceIds: EvidenceId[];
   expectedDecision: Decision;
   expectedBoundary: RunBoundary;
 };
