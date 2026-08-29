@@ -48,7 +48,6 @@ body {
   min-width: 0;
   min-height: 100dvh;
   margin: 0;
-  overflow-x: hidden;
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-sans);
@@ -79,4 +78,10 @@ summary:focus-visible {
 ::selection {
   background: var(--accent-fill);
   color: var(--accent-contrast);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }

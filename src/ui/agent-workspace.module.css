@@ -325,13 +325,12 @@
 }
 
 .traceDetails summary {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  justify-content: space-between;
+  display: list-item;
   min-height: 3.6rem;
+  padding: 1.1rem 0;
   color: var(--ink);
   font-weight: 720;
+  line-height: 1.4;
   cursor: pointer;
 }
 
@@ -340,9 +339,11 @@
 }
 
 .traceDetails summary span {
+  float: right;
+  margin-left: 1rem;
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 500;
 }
 
@@ -374,7 +375,7 @@
 .traceStatus {
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 0.66rem;
+  font-size: 0.76rem;
 }
 
 .traceReason {
@@ -471,6 +472,13 @@
 
 .disclosure p {
   margin: 0;
+}
+
+@media (max-width: 56rem) {
+  .workspaceGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
 }
 
 @media (max-width: 767px) {

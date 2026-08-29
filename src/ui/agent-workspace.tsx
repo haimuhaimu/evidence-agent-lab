@@ -98,22 +98,26 @@ export function AgentWorkspace({ auditPassRate }: { auditPassRate: number }) {
   }
 
   function storeReview(verdict: "accurate" | "needs_correction") {
-    const selectedLabel = DECISION_OPTIONS.find(
-      (option) => option.value === correctedDecision,
-    )?.label;
-    const record = createReview({
-      run,
-      verdict,
-      ...(verdict === "needs_correction" ? { correctedDecision } : {}),
-      note: verdict === "accurate"
-        ? "Marked accurate in the local review workspace."
-        : `Reviewer selected ${selectedLabel ?? correctedDecision}.`,
-      groupFeedback: "unreviewed",
-      createdAt: new Date().toISOString(),
-    });
+    try {
+      const selectedLabel = DECISION_OPTIONS.find(
+        (option) => option.value === correctedDecision,
+      )?.label;
+      const record = createReview({
+        run,
+        verdict,
+        ...(verdict === "needs_correction" ? { correctedDecision } : {}),
+        note: verdict === "accurate"
+          ? "Marked accurate in the local review workspace."
+          : `Reviewer selected ${selectedLabel ?? correctedDecision}.`,
+        groupFeedback: "unreviewed",
+        createdAt: new Date().toISOString(),
+      });
 
-    saveReview(window.localStorage, record);
-    setReviewStatus("Saved only in this browser.");
+      saveReview(window.localStorage, record);
+      setReviewStatus("Saved only in this browser.");
+    } catch {
+      setReviewStatus("Review could not be saved in this browser.");
+    }
   }
 
   return (
