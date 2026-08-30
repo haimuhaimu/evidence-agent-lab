@@ -1,0 +1,212 @@
+{
+  "caseCount": 18,
+  "passedCaseCount": 18,
+  "auditPassRate": 1,
+  "gateTotals": {
+    "requestUnderstanding": 18,
+    "capabilityPath": 18,
+    "evidenceCoverage": 18,
+    "decisionCorrectness": 18,
+    "honestyBoundary": 18
+  },
+  "cases": [
+    {
+      "id": "steady_7d",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "steady_quarter",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "steady_half_month",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "scale_healthy",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "scale_without_intent",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "click_drop",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "retention_drop",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "feed_drop",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "incomplete_data",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "unknown_object",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "missing_object",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "explicit_30d",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "scale_click_drop",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "scale_incomplete",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "feed_drop_quarter",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "click_drop_quarter",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "healthy_no_window",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "healthy_scale_30d",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    }
+  ]
+}
