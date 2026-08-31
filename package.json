@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "tsx --test src/**/*.test.ts scripts/*.test.ts",
+    "case": "tsx scripts/run-case.ts",
     "bench": "tsx scripts/bench.ts",
     "bench:update": "tsx scripts/bench.ts --update",
     "security:scan": "tsx scripts/public-safety-scan.ts",

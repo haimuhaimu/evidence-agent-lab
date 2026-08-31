@@ -23,6 +23,16 @@ npm run verify
 npm run dev
 ```
 
+Replay the same deterministic agent path from a terminal:
+
+```bash
+npm run --silent case -- --entity content_feed_drop --query "近 7 天为什么掉了"
+```
+
+The command prints one JSON document containing the parsed request, decision, primary evidence, unknowns, ordered capability trace, and structured honesty boundary. A valid synthetic run exits successfully even when its decision is `insufficient_evidence`, so evidence refusal remains available for inspection. Missing, duplicate, empty, or unknown arguments fail with a non-zero exit code.
+
+This is a read-only replay of checked-in synthetic fixtures. It does not accept real records, call a network service, write review state, send an escalation, or take a production action.
+
 ## Current benchmark
 
 The checked-in snapshot at [`benchmark/latest.json`](benchmark/latest.json) contains 18 fixed synthetic cases.
