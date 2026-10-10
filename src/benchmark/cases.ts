@@ -278,4 +278,16 @@ export const BENCHMARK_CASES: BenchmarkCase[] = [
   defineCase({ id: "click_drop_quarter", entityId: "content_click_drop", query: "近一季度为什么掉了", goal: "diagnose", days: 90, expectedDecision: "intervene" }),
   defineCase({ id: "healthy_no_window", entityId: "content_steady", query: "现在正常吗", goal: "diagnose", days: 7, expectedDecision: "expected" }),
   defineCase({ id: "healthy_scale_30d", entityId: "content_scale", query: "近 30 天值得追投吗", goal: "scale", days: 30, expectedDecision: "scale" }),
+  defineCase({
+    id: "conflicting_windows", entityId: "content_steady",
+    query: "近 7 天和近 30 天正常吗", goal: "diagnose", days: 7,
+    expectedDecision: "insufficient_evidence", calls: [], evidence: [], primaryEvidenceIds: [],
+    clarificationNeeded: ["Choose one time window per request."],
+  }),
+  defineCase({
+    id: "invalid_second_window", entityId: "content_steady",
+    query: "近 7 天和近 0 天正常吗", goal: "diagnose", days: 7,
+    expectedDecision: "insufficient_evidence", calls: [], evidence: [], primaryEvidenceIds: [],
+    clarificationNeeded: ["Use a whole-number time window between 1 and 180 days."],
+  }),
 ];

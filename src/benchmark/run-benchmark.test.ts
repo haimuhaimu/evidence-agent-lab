@@ -11,12 +11,12 @@ import {
 } from "./report";
 import { runBenchmark } from "./run-benchmark";
 
-const ALL_GATES_AT_EIGHTEEN = {
-  requestUnderstanding: 18,
-  capabilityPath: 18,
-  evidenceCoverage: 18,
-  decisionCorrectness: 18,
-  honestyBoundary: 18,
+const ALL_GATES_AT_TWENTY = {
+  requestUnderstanding: 20,
+  capabilityPath: 20,
+  evidenceCoverage: 20,
+  decisionCorrectness: 20,
+  honestyBoundary: 20,
 };
 
 function deterministicClock(): () => number {
@@ -30,23 +30,23 @@ function deterministicClock(): () => number {
   };
 }
 
-test("runs all eighteen cases through the same evidence-agent path", () => {
+test("runs all twenty cases through the same evidence-agent path", () => {
   const report = runBenchmark(deterministicClock());
   const directResults = BENCHMARK_CASES.map((definition) =>
     evaluateCase(definition, runEvidenceAgent(definition.request))
   );
 
   assert.deepEqual(report.cases, directResults);
-  assert.equal(report.caseCount, 18);
-  assert.equal(report.passedCaseCount, 18);
+  assert.equal(report.caseCount, 20);
+  assert.equal(report.passedCaseCount, 20);
   assert.equal(report.auditPassRate, 1);
-  assert.deepEqual(report.gateTotals, ALL_GATES_AT_EIGHTEEN);
+  assert.deepEqual(report.gateTotals, ALL_GATES_AT_TWENTY);
 });
 
 test("reports the median local execution time from the injected clock", () => {
   const report = runBenchmark(deterministicClock());
 
-  assert.equal(report.medianExecutionMs, 9.5);
+  assert.equal(report.medianExecutionMs, 10.5);
 });
 
 test("creates a stable snapshot without the local timing field", () => {
@@ -55,10 +55,10 @@ test("creates a stable snapshot without the local timing field", () => {
 
   assert.equal(Object.hasOwn(snapshot, "medianExecutionMs"), false);
   assert.deepEqual(snapshot, {
-    caseCount: 18,
-    passedCaseCount: 18,
+    caseCount: 20,
+    passedCaseCount: 20,
     auditPassRate: 1,
-    gateTotals: ALL_GATES_AT_EIGHTEEN,
+    gateTotals: ALL_GATES_AT_TWENTY,
     cases: report.cases,
   });
 });
@@ -68,7 +68,7 @@ test("compares benchmark snapshots canonically across CRLF without accepting sem
   const serialized = serializeBenchmarkSnapshot(snapshot);
 
   assert.equal(benchmarkSnapshotsEqual(serialized.replaceAll("\n", "\r\n"), snapshot), true);
-  assert.equal(benchmarkSnapshotsEqual(serialized.replace('"caseCount": 18', '"caseCount": 17'), snapshot), false);
+  assert.equal(benchmarkSnapshotsEqual(serialized.replace('"caseCount": 20', '"caseCount": 19'), snapshot), false);
   assert.equal(benchmarkSnapshotsEqual("not-json", snapshot), false);
 });
 
@@ -76,8 +76,8 @@ test("formats a short terminal table with the honest audit total", () => {
   const output = formatBenchmarkTable(runBenchmark(deterministicClock()));
 
   assert.match(output, /Gate\s+Passed\s+Total/);
-  assert.match(output, /requestUnderstanding\s+18\s+18/);
-  assert.match(output, /honestyBoundary\s+18\s+18/);
-  assert.match(output, /Audit Pass Rate: 18\/18 \(100%\)/);
-  assert.match(output, /Median execution: 9\.500 ms/);
+  assert.match(output, /requestUnderstanding\s+20\s+20/);
+  assert.match(output, /honestyBoundary\s+20\s+20/);
+  assert.match(output, /Audit Pass Rate: 20\/20 \(100%\)/);
+  assert.match(output, /Median execution: 10\.500 ms/);
 });

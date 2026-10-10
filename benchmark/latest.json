@@ -1,13 +1,13 @@
 {
-  "caseCount": 18,
-  "passedCaseCount": 18,
+  "caseCount": 20,
+  "passedCaseCount": 20,
   "auditPassRate": 1,
   "gateTotals": {
-    "requestUnderstanding": 18,
-    "capabilityPath": 18,
-    "evidenceCoverage": 18,
-    "decisionCorrectness": 18,
-    "honestyBoundary": 18
+    "requestUnderstanding": 20,
+    "capabilityPath": 20,
+    "evidenceCoverage": 20,
+    "decisionCorrectness": 20,
+    "honestyBoundary": 20
   },
   "cases": [
     {
@@ -199,6 +199,28 @@
     },
     {
       "id": "healthy_scale_30d",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "conflicting_windows",
+      "gates": {
+        "requestUnderstanding": true,
+        "capabilityPath": true,
+        "evidenceCoverage": true,
+        "decisionCorrectness": true,
+        "honestyBoundary": true
+      },
+      "passed": true
+    },
+    {
+      "id": "invalid_second_window",
       "gates": {
         "requestUnderstanding": true,
         "capabilityPath": true,
