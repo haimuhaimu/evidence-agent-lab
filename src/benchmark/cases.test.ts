@@ -21,11 +21,13 @@ const EXPECTED_CASES = [
   ["click_drop_quarter", "content_click_drop", "diagnose", 90, "intervene"],
   ["healthy_no_window", "content_steady", "diagnose", 7, "expected"],
   ["healthy_scale_30d", "content_scale", "scale", 30, "scale"],
+  ["conflicting_windows", "content_steady", "diagnose", 7, "insufficient_evidence"],
+  ["invalid_second_window", "content_steady", "diagnose", 7, "insufficient_evidence"],
 ] as const;
 
-test("ships exactly the eighteen fixed request and decision contracts", () => {
-  assert.equal(BENCHMARK_CASES.length, 18);
-  assert.equal(new Set(BENCHMARK_CASES.map((item) => item.id)).size, 18);
+test("ships exactly the twenty fixed request and decision contracts", () => {
+  assert.equal(BENCHMARK_CASES.length, 20);
+  assert.equal(new Set(BENCHMARK_CASES.map((item) => item.id)).size, 20);
   assert.deepEqual(
     BENCHMARK_CASES.map((item) => [
       item.id,

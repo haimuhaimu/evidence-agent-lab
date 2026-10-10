@@ -63,3 +63,45 @@ test("rejects every explicit malformed or unsafe numeric time window", () => {
     );
   }
 });
+
+test("asks for one window instead of choosing among conflicting windows", () => {
+  for (const query of [
+    "近 7 天和近 30 天正常吗",
+    "近 30 天和近 7 天正常吗",
+    "半个月和近一季度正常吗",
+    "近 7 天和半个月正常吗",
+    "近半个月和近7天正常吗",
+  ]) {
+    const result = parseAgentRequest({ entityId: "content_steady", query });
+    assert.deepEqual(result.clarificationNeeded, ["Choose one time window per request."], query);
+  }
+});
+
+test("validates later numeric windows even when the first one is valid", () => {
+  for (const query of [
+    "近 7 天和近 0 天正常吗",
+    "近 7 天和近 -1 天正常吗",
+    "近 7 天和近 1.5 天正常吗",
+    "近 7 天和近 abc 天正常吗",
+    "近 7 天和近 181 天正常吗",
+    "近 7 天和近 999999999999999999999 天正常吗",
+  ]) {
+    const result = parseAgentRequest({ entityId: "content_steady", query });
+    assert.deepEqual(result.clarificationNeeded,
+      ["Use a whole-number time window between 1 and 180 days."], query);
+  }
+});
+
+test("accepts repeated equivalent windows without inventing a conflict", () => {
+  for (const [query, days] of [
+    ["近 7 天，也就是近 7 天的表现", 7],
+    ["半个月，也就是近 15 天正常吗", 15],
+    ["近一季度，也就是近 90 天正常吗", 90],
+    ["近半个月，也就是近15天正常吗", 15],
+    ["近一季度，也就是近90天正常吗", 90],
+  ] as const) {
+    const result = parseAgentRequest({ entityId: "content_steady", query });
+    assert.equal(result.days, days, query);
+    assert.deepEqual(result.clarificationNeeded, [], query);
+  }
+});

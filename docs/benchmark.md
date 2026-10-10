@@ -1,6 +1,6 @@
 # Benchmark
 
-The benchmark runs 18 fixed synthetic cases through the same public agent path. A case passes only when all five audit gates pass. Audit Pass Rate is conformance to this declared contract, not model accuracy or real-world calibration.
+The benchmark runs 20 fixed synthetic cases through the same public agent path. A case passes only when all five audit gates pass. Audit Pass Rate is conformance to this declared contract, not model accuracy or real-world calibration.
 
 ## Cases
 
@@ -26,6 +26,8 @@ The query text is synthetic. Each Chinese query has an English explanation below
 | `click_drop_quarter` | `近一季度为什么掉了` | Ask why performance fell over a 90-day quarter when click evidence explains it. | `intervene` |
 | `healthy_no_window` | `现在正常吗` | Ask whether steady content is normal now; the parser uses its declared 7-day default. | `expected` |
 | `healthy_scale_30d` | `近 30 天值得追投吗` | Ask whether healthy growth evidence supports scaling over an explicit 30-day window. | `scale` |
+| `conflicting_windows` | `近 7 天和近 30 天正常吗` | Ask about conflicting windows; require a single window before any capability runs. | `insufficient_evidence` |
+| `invalid_second_window` | `近 7 天和近 0 天正常吗` | A later invalid window must not disappear behind an earlier valid one. | `insufficient_evidence` |
 
 ## Five gates
 
@@ -41,7 +43,7 @@ An `insufficient_evidence` result passes when the case requires an honest early 
 
 ## Current snapshot
 
-[`benchmark/latest.json`](../benchmark/latest.json) records 18/18 cases passing, with 18/18 for each of the five gates.
+[`benchmark/latest.json`](../benchmark/latest.json) records 20/20 cases passing, with 20/20 for each of the five gates. The two window-validation regressions extend the original 18 cases without changing their contracts or results. The retained first-window `days` field is not an executed window when clarification is required: both new cases expect no calls, evidence, or primary evidence IDs.
 
 ## Snapshot updates
 
