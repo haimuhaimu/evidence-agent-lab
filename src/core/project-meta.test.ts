@@ -16,8 +16,8 @@ test("keeps the Next runtime and ESLint contract on the exact same release", asy
     await readFile(new URL("../../package.json", import.meta.url), "utf8"),
   );
 
-  assert.equal(packageJson.dependencies.next, "16.3.3");
-  assert.equal(packageJson.devDependencies["eslint-config-next"], "16.3.3");
+  assert.equal(packageJson.dependencies.next, "16.3.8");
+  assert.equal(packageJson.devDependencies["eslint-config-next"], "16.3.8");
 });
 
 test("pins Node 24 GitHub Actions releases to their reviewed immutable commits", async () => {

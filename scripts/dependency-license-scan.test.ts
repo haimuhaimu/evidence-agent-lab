@@ -125,17 +125,17 @@ test("accepts only locally verified package version expression tuples", () => {
         license: "CC-BY-4.0",
       },
       "node_modules/@img/sharp-libvips-linux-x64": {
-        version: "1.3.3",
+        version: "1.3.4",
         optional: true,
         license: "LGPL-3.0-or-later",
       },
       "node_modules/@img/sharp-win32-x64": {
-        version: "0.35.4",
+        version: "0.35.5",
         optional: true,
         license: "Apache-2.0 AND LGPL-3.0-or-later",
       },
       "node_modules/@img/sharp-wasm32": {
-        version: "0.35.4",
+        version: "0.35.5",
         optional: true,
         license: "Apache-2.0 AND LGPL-3.0-or-later AND MIT",
       },

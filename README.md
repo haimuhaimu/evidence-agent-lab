@@ -35,17 +35,17 @@ This is a read-only replay of checked-in synthetic fixtures. It does not accept 
 
 ## Current benchmark
 
-The checked-in snapshot at [`benchmark/latest.json`](benchmark/latest.json) contains 18 fixed synthetic cases.
+The checked-in snapshot at [`benchmark/latest.json`](benchmark/latest.json) contains 20 fixed synthetic cases.
 
 | Gate | Passed | Total |
 | --- | ---: | ---: |
-| Request understanding | 18 | 18 |
-| Capability path | 18 | 18 |
-| Evidence coverage | 18 | 18 |
-| Decision correctness | 18 | 18 |
-| Honesty boundary | 18 | 18 |
+| Request understanding | 20 | 20 |
+| Capability path | 20 | 20 |
+| Evidence coverage | 20 | 20 |
+| Decision correctness | 20 | 20 |
+| Honesty boundary | 20 | 20 |
 
-Audit Pass Rate: 18/18 (100%)
+Audit Pass Rate: 20/20 (100%)
 
 Audit Pass Rate is five-gate conformance, including exact request/entity/clarification state, ordered call statuses, call-owned evidence values, structured honesty fields, and an honest `insufficient_evidence` stop. It is not model accuracy.
 
@@ -56,7 +56,9 @@ Audit Pass Rate is five-gate conformance, including exact request/entity/clarifi
 | `steady_7d` | `expected` | The request, capability path, evidence, decision, and boundary notes match the declared case. |
 | `incomplete_data` | `insufficient_evidence` | The safety gate finds incomplete evidence and stops the run before unsupported comparisons. Honest refusal is the correct result. |
 
-See [the complete benchmark contract](docs/benchmark.md) for all 18 cases and snapshot rules.
+The agent accepts one time window per request. Conflicting recognized windows or any invalid explicit day window require clarification before capability calls; repeated equivalent windows remain valid. It does not perform multi-window comparisons.
+
+See [the complete benchmark contract](docs/benchmark.md) for all 20 cases and snapshot rules.
 
 ## Architecture
 

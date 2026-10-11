@@ -66,6 +66,21 @@ test("stops before capabilities when the entity is missing from the request", ()
   assert.deepEqual(run.unknowns, ["Choose a synthetic content object."]);
 });
 
+test("never produces a single-window conclusion for conflicting or invalid later windows", () => {
+  for (const query of [
+    "近 7 天和近 30 天正常吗",
+    "近 7 天和近 0 天正常吗",
+    "半个月和近一季度正常吗",
+  ]) {
+    const run = runEvidenceAgent({ entityId: "content_steady", query });
+    assert.equal(run.decision, "insufficient_evidence", query);
+    assert.deepEqual(run.calls, [], query);
+    assert.deepEqual(run.evidence, [], query);
+    assert.deepEqual(run.primaryEvidenceIds, [], query);
+    assert.ok(run.unknowns.length > 0, query);
+  }
+});
+
 test("stops after loading an unknown synthetic entity", () => {
   const run = runEvidenceAgent({ entityId: "unknown_object", query: "近 7 天正常吗" });
 
