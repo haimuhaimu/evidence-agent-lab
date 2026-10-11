@@ -64,13 +64,13 @@ function isVerifiedDependencyLicense(
       version === "1.0.30001810" &&
       license === "CC-BY-4.0") ||
     (verifiedLibvipsPackages.has(packageName) &&
-      version === "1.3.3" &&
+      version === "1.3.4" &&
       license === "LGPL-3.0-or-later") ||
     (verifiedSharpWin32Packages.has(packageName) &&
-      version === "0.35.4" &&
+      version === "0.35.5" &&
       license === "Apache-2.0 AND LGPL-3.0-or-later") ||
     (packageName === "@img/sharp-wasm32" &&
-      version === "0.35.4" &&
+      version === "0.35.5" &&
       license === "Apache-2.0 AND LGPL-3.0-or-later AND MIT")
   );
 }
